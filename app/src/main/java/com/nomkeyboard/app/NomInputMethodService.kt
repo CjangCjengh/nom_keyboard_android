@@ -144,19 +144,39 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             newSelStart, newSelEnd,
             candidatesStart, candidatesEnd
         )
-        // Detect a genuine caret move that is NOT caused by our own setComposingText:
-        //   - candidatesStart < 0 means the framework reports no active composing region for
-        //     this update (i.e. it's a selection-only change, typically a user tap or an
-        //     arrow-key navigation in the host editor).
-        //   - The selection indices actually changed compared to the previous report.
-        // When that happens while we still have a pending composing buffer, the user clearly
-        // walked away from the word they were typing. Commit it as plain Vietnamese (same
-        // behaviour as tapping the left-side composing label on the candidate bar) so the
-        // text field isn't left with a dangling composing underline in a now-unrelated place.
-        val caretMoved = newSelStart != oldSelStart || newSelEnd != oldSelEnd
-        if (composing.isNotEmpty() && candidatesStart < 0 && caretMoved) {
-            commitComposing()
-            return
+        // Distinguish "we just called setComposingText" from "the user moved the caret".
+        //
+        // When WE call setComposingText(text, 1), Android replies with a selection update
+        // whose caret sits exactly at candidatesEnd (i.e. at the tail of the composing
+        // span). The user, on the other hand, can drop the caret anywhere – outside the
+        // span, or anywhere strictly inside it. So the reliable "user moved the caret"
+        // signal is:
+        //   - composing region reported as absent (candidatesStart < 0), OR
+        //   - the new caret is NOT exactly at candidatesEnd with an empty selection.
+        // Note: we treat "caret at candidatesEnd with selection collapsed" as our own
+        // echo; any selection (newSelStart != newSelEnd) or any other position inside the
+        // span is treated as a deliberate user action.
+        if (composing.isNotEmpty()) {
+            val caretIsOurEcho = candidatesStart >= 0 &&
+                    newSelStart == newSelEnd && newSelStart == candidatesEnd
+            if (!caretIsOurEcho) {
+                // Solidify the current composing text in place: finishComposingText()
+                // simply removes the "composing" flag (and the underline) from the span
+                // without rewriting its content OR moving the caret. That's exactly what
+                // we want – the raw Vietnamese text the user was typing is kept verbatim,
+                // and crucially the caret STAYS where the user just tapped. No follow-up
+                // setSelection() needed, so a single tap does commit-in-place + move-caret
+                // in one shot.
+                currentInputConnection?.finishComposingText()
+                composing = ""
+                currentCandidates = emptyList()
+                if (::candidateBar.isInitialized) {
+                    candidateBar.clear()
+                    candidateBar.visibility = View.GONE
+                }
+                maybeAutoShift()
+                return
+            }
         }
         // Caret jumped elsewhere (not a composing-text update). Re-evaluate auto-capitalisation
         // because the user may have tapped to position the caret at the start of a new line.
