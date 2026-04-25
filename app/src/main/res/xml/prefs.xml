@@ -9,6 +9,14 @@
         android:entryValues="@array/theme_values"
         android:defaultValue="system" />
 
+    <ListPreference
+        android:key="pref_tone_style"
+        android:title="@string/pref_tone_style"
+        android:summary="@string/pref_tone_style_summary"
+        android:entries="@array/tone_style_entries"
+        android:entryValues="@array/tone_style_values"
+        android:defaultValue="old" />
+
     <SwitchPreferenceCompat
         android:key="pref_show_candidates"
         android:title="@string/pref_show_candidates"

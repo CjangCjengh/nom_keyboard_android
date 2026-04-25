@@ -149,8 +149,16 @@ object TelexEngine {
      * Core entry point: given the current composing buffer and a new character,
      * return the new composing buffer after applying Telex rules.
      * If [ch] does not trigger any transformation, the result is simply [composing] + [ch].
+     *
+     * [toneStyleOld] controls where the tone mark lands on OPEN syllables whose nucleus is a
+     * falling diphthong such as `oa / oe / uy`:
+     *   - true  (traditional / old style): place the tone on the FIRST vowel of the diphthong
+     *     -> `hóa`, `hòe`, `thúy`, `quý`.
+     *   - false (modern / new style): place it on the LAST vowel -> `hoá`, `hoè`, `thuý`, `quý`.
+     * Closed syllables (with a trailing consonant) and syllables carrying a modified vowel
+     * (ơ/ê/â/ô/ă) are unaffected – those rules are unambiguous across styles.
      */
-    fun apply(composing: String, ch: Char): String {
+    fun apply(composing: String, ch: Char, toneStyleOld: Boolean = true): String {
         // "w" typed on its own (no prior letters, at word start, or after a non-letter) expands
         // to "ư" – a very common shortcut most Vietnamese Telex engines provide.
         if ((ch == 'w' || ch == 'W') && (composing.isEmpty() || !composing.last().isLetter())) {
@@ -245,7 +253,7 @@ object TelexEngine {
         // by a consonant like "nếuma" – and instead emit the trigger letter literally so the
         // user can keep typing foreign words / run-on syllables transparently.
         if (tone != null && composing.any { it.isVowelLike() } && isLastSyllablePhonotacticallyValid(composing)) {
-            val idx = findToneTargetIndex(composing)
+            val idx = findToneTargetIndex(composing, toneStyleOld)
             if (idx >= 0) {
                 val v = composing[idx]
                 val base = toneReverse[v]?.first ?: v
@@ -421,7 +429,7 @@ object TelexEngine {
                             val newPrev = if (prev.isUpperCase()) 'Ư' else 'ư'
                             val newCur = if (c.isUpperCase()) 'Ơ' else 'ơ'
                             return composing.substring(0, i - 1) + newPrev + newCur +
-                                composing.substring(i + 1)
+                                    composing.substring(i + 1)
                         }
                     }
                     val repl = if (c.isUpperCase()) 'Ơ' else 'ơ'
@@ -512,14 +520,13 @@ object TelexEngine {
      *   3. Otherwise, if the word ends with a consonant, put the tone on the vowel
      *      immediately before the trailing consonant cluster (the "nucleus" rule, e.g.
      *      "toan" -> "toán", "hoang" -> "hoàng").
-     *   4. Otherwise (open syllable, i.e. last char is a vowel), put the tone on the
-     *      second-to-last vowel – this is the modern Vietnamese style for diphthongs like
-     *      "oa", "oe", "uy" ("hoà" not "hòa" in open syllables, but "hoá" style is what
-     *      modern orthography picks for "hóa"... we follow the modern style: second-to-last
-     *      vowel).
+     *   4. Otherwise (open syllable, i.e. last char is a vowel), the behaviour depends on
+     *      [toneStyleOld]:
+     *        - old (traditional): tone on the SECOND-to-last vowel -> "hóa", "hòe", "thúy".
+     *        - new (modern):      tone on the LAST vowel          -> "hoá", "hoè", "thuý".
      *   5. Fallback: the last vowel in the buffer.
      */
-    private fun findToneTargetIndex(s: String): Int {
+    private fun findToneTargetIndex(s: String, toneStyleOld: Boolean = true): Int {
         // Compute effective "vowel scan start": skip a leading gi-/qu- glide when appropriate.
         val scanStart = glideSkipOffset(s)
 
@@ -547,7 +554,12 @@ object TelexEngine {
         if (vowelIdx.size == 1) return vowelIdx[0]
         val lastVowel = vowelIdx.last()
         val hasTrailingConsonant = lastVowel < s.length - 1
-        return if (hasTrailingConsonant) lastVowel else vowelIdx[vowelIdx.size - 2]
+        return when {
+            hasTrailingConsonant -> lastVowel
+            // Open syllable: let the user-chosen orthography style decide.
+            toneStyleOld -> vowelIdx[vowelIdx.size - 2] // hóa / hòe / thúy
+            else -> lastVowel                          // hoá / hoè / thuý
+        }
     }
 
     /**

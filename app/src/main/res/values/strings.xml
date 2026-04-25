@@ -13,6 +13,8 @@
 
     <string name="pref_dark_theme">Giao diện tối</string>
     <string name="pref_dark_theme_summary">Sử dụng nền tối cho bàn phím</string>
+    <string name="pref_tone_style">Vị trí dấu thanh</string>
+    <string name="pref_tone_style_summary">Chọn kiểu cũ (hóa, thúy) hay kiểu mới (hoá, thuý) khi gõ các vần mở như oa, oe, uy</string>
     <string name="pref_vibrate">Rung khi gõ phím</string>
     <string name="pref_vibrate_summary">Phản hồi rung nhẹ mỗi khi nhấn phím</string>
     <string name="pref_sound">Âm thanh phím</string>

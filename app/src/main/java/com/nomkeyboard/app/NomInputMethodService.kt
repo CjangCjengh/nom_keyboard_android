@@ -161,7 +161,10 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         val lastSpace = composing.lastIndexOf(' ')
         val head = if (lastSpace >= 0) composing.substring(0, lastSpace + 1) else ""
         val tail = if (lastSpace >= 0) composing.substring(lastSpace + 1) else composing
-        val newTail = TelexEngine.apply(tail, ch)
+        // Tone-placement style: "old" = traditional (hóa / thúy), "new" = modern (hoá / thuý).
+        // Only affects open-syllable diphthongs; closed syllables are unambiguous.
+        val toneStyleOld = prefs.getString("pref_tone_style", "old") != "new"
+        val newTail = TelexEngine.apply(tail, ch, toneStyleOld)
         composing = head + newTail
         updateComposing()
     }
@@ -234,9 +237,9 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // after they pressed space.
         val trimmed = composing.trim()
         val hasExactCandidate = trimmed.isNotEmpty() && (
-            NomDictionary.lookupWord(trimmed).isNotEmpty() ||
-                NomDictionary.lookupSingle(trimmed).isNotEmpty()
-            )
+                NomDictionary.lookupWord(trimmed).isNotEmpty() ||
+                        NomDictionary.lookupSingle(trimmed).isNotEmpty()
+                )
         if (!hasExactCandidate) {
             currentInputConnection?.commitText(trimmed, 1)
             composing = ""
@@ -383,8 +386,8 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         if (i < 0) return true
         val c = before[i]
         return c == '.' || c == '!' || c == '?' ||
-            c == '\u3002' /* 。 */ || c == '\uff01' /* ！ */ || c == '\uff1f' /* ？ */ ||
-            c == '\n' || c == '\r'
+                c == '\u3002' /* 。 */ || c == '\uff01' /* ！ */ || c == '\uff1f' /* ？ */ ||
+                c == '\n' || c == '\r'
     }
 
     private fun playKeyClickSound() {

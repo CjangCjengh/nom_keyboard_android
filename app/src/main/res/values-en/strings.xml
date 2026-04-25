@@ -13,6 +13,8 @@
 
     <string name="pref_dark_theme">Dark theme</string>
     <string name="pref_dark_theme_summary">Use a dark background for the keyboard</string>
+    <string name="pref_tone_style">Tone mark placement</string>
+    <string name="pref_tone_style_summary">Choose traditional (hóa, thúy) or modern (hoá, thuý) placement on open diphthongs such as oa, oe, uy</string>
     <string name="pref_vibrate">Key vibration</string>
     <string name="pref_vibrate_summary">Light haptic feedback when pressing keys</string>
     <string name="pref_sound">Key sound</string>

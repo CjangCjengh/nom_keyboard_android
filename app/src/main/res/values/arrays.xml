@@ -10,4 +10,12 @@
         <item>light</item>
         <item>dark</item>
     </string-array>
+    <string-array name="tone_style_entries">
+        <item>Kiểu cũ (hóa, thúy)</item>
+        <item>Kiểu mới (hoá, thuý)</item>
+    </string-array>
+    <string-array name="tone_style_values">
+        <item>old</item>
+        <item>new</item>
+    </string-array>
 </resources>
