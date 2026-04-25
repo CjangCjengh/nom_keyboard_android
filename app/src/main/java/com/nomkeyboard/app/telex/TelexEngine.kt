@@ -486,6 +486,7 @@ object TelexEngine {
         //     oi         -> o gets horn      (coi -> cơi)
         //     ui         -> u gets horn      (tui -> tưi)
         //     ua         -> u gets horn      (ua -> ưa, cua -> cưa, mua -> mưa)
+        //     uu         -> first u gets horn (uu -> ưu, cuu -> cưu)
         //     oa         -> a gets breve     (oa -> oă, hoa -> hoă, gioa -> gioă, qua -> quă)
         //     uo(+coda)  -> double (u+o both, "ươ")  (buon -> bươn, tuong -> tương, cuoi -> cươi)
         //
@@ -582,6 +583,7 @@ object TelexEngine {
             "oi" -> intArrayOf(1, 0)
             "ui" -> intArrayOf(1, 0)
             "ua" -> intArrayOf(1, 0)
+            "uu" -> intArrayOf(1, 0)
             "oa" -> intArrayOf(0, 2)
             "uo" -> intArrayOf(1, 1)
             "uoi" -> intArrayOf(1, 1, 0)
