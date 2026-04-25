@@ -681,13 +681,23 @@ object TelexEngine {
         for (i in composing.indices.reversed()) {
             val c = composing[i]
             if (!c.isLetter()) break
-            if (c == targetBase) {
-                return composing.substring(0, i) + hatChar + composing.substring(i + 1)
+            // Match either the plain target letter OR a toned version of it (á/à/ả/ã/ạ etc.)
+            // so that typing 'e' after "đẻ" upgrades the ẻ to ể (hat + hook-above) rather
+            // than being appended as a literal 'e'. Preserve the existing tone when
+            // swapping in the hat form.
+            val entry = toneReverse[c]
+            val baseOfC = entry?.first ?: c
+            if (baseOfC == targetBase) {
+                val tone = entry?.second ?: 0
+                val repl = toneMap[hatChar]?.get(tone) ?: hatChar
+                return composing.substring(0, i) + repl + composing.substring(i + 1)
             }
-            // If we hit a vowel that already has a diacritic from the same base family, stop
-            // scanning – the user has already tone-decorated this syllable's vowel and is now
-            // typing a plain letter, which should just be appended.
-            if (c == hatChar) return null
+            // If we hit a vowel that already has a diacritic from the same base family
+            // (with or without an extra tone), stop scanning – the user has already
+            // hat-decorated this syllable's vowel and is now typing a plain letter, which
+            // should just be appended.
+            val hatBase = toneReverse[hatChar]?.first ?: hatChar
+            if (baseOfC == hatBase) return null
         }
         return null
     }
@@ -773,7 +783,11 @@ object TelexEngine {
         //     oi  ôi  ơi  ui  ưi   (second vowel is i)
         // (oo/ou/uo/uu don't appear as standalone open syllables in modern Vietnamese, and
         // any "uo" input is rewritten to "uơ"/"uô" by the horn rule before we get here.)
-        // So: it's rising iff firstCh ∈ {o,u} AND secondCh is NOT 'i'.
+        // So: it's rising iff firstCh ∈ {o,u} AND secondCh is NOT 'i'... with one more
+        // exception: the "ua" / "ưa" cluster is actually a FALLING diphthong in modern
+        // Vietnamese phonology (u is the nucleus, a is the off-glide). The canonical forms
+        // are của / cửa / múa / mưa – the tone always lands on the u, in BOTH traditions.
+        // Writing "cuả" would be wrong in any orthography.
         val firstCh = s[firstVowel].lowercaseChar()
         val secondCh = s[lastVowel].lowercaseChar()
         // Same-letter double-vowel clusters (currently only "uu" survives the phonotactic
@@ -781,6 +795,8 @@ object TelexEngine {
         // lands on the first vowel, giving "uu"+r -> "ủu" rather than the misleading "uủ"
         // that the generic rising-diphthong branch below would produce.
         if (firstCh == secondCh) return firstVowel
+        // ua / ưa: falling diphthong, tone on the first vowel (u/ư).
+        if (firstCh in "uư" && secondCh == 'a') return firstVowel
         val isRisingDiphthong = firstCh in "ou" && secondCh != 'i'
         return when {
             !isRisingDiphthong -> firstVowel   // falling diphthong: gái, sáo, éo, úi, ối...
