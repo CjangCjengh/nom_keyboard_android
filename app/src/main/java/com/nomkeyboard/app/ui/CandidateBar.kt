@@ -58,6 +58,11 @@ class CandidateBar @JvmOverloads constructor(
     // The current composing string (rendered on the left in the default font)
     private var composing: String = ""
 
+    // Hit-box of the composing label area – updated on every layout/draw so that taps on the
+    // left "quốc ngữ" region can be detected and translated into a "commit composing as-is"
+    // action. RectF.isEmpty() means the area is not interactive (empty composing).
+    private val composingRect = RectF()
+
     // Candidate list
     private var candidates: List<String> = emptyList()
     private val candidateRects = ArrayList<RectF>()
@@ -102,7 +107,10 @@ class CandidateBar @JvmOverloads constructor(
         // Left-side area reserved for the composing label
         if (composing.isNotEmpty()) {
             val w = labelPaint.measureText(composing) + padH * 2
+            composingRect.set(0f, 0f, w, h)
             x += w
+        } else {
+            composingRect.setEmpty()
         }
         for (c in candidates) {
             val tw = max(textPaint.measureText(c), 28f) + padH * 2
@@ -126,6 +134,9 @@ class CandidateBar @JvmOverloads constructor(
         if (composing.isNotEmpty()) {
             val w = labelPaint.measureText(composing) + padH * 2
             val rect = RectF(0f, 0f, w, h)
+            if (downOnComposing) {
+                canvas.drawRoundRect(rect, 8f, 8f, highlightPaint)
+            }
             val y = rect.centerY() - (labelPaint.descent() + labelPaint.ascent()) / 2f
             canvas.drawText(composing, padH, y, labelPaint)
             // Divider on the right edge of the composing area
@@ -151,6 +162,10 @@ class CandidateBar @JvmOverloads constructor(
 
     private var downX = 0f
     private var downIndex = -1
+    // True when the current gesture started in the composing label region (index semantics
+    // reuse the sentinel value -1 because composing taps are signalled to the listener as
+    // an "out-of-band" commit request).
+    private var downOnComposing = false
     private var dragged = false
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -160,6 +175,8 @@ class CandidateBar @JvmOverloads constructor(
                 downX = event.x
                 dragged = false
                 downIndex = findCandidate(x)
+                downOnComposing = downIndex < 0 && !composingRect.isEmpty &&
+                        x >= composingRect.left && x <= composingRect.right
                 pressedIndex = downIndex
                 invalidate()
                 parent?.requestDisallowInterceptTouchEvent(true)
@@ -171,18 +188,27 @@ class CandidateBar @JvmOverloads constructor(
                     scrollX = (scrollX - dx).coerceIn(0f, maxScrollX)
                     downX = event.x
                     pressedIndex = -1
+                    downOnComposing = false
                     invalidate()
                 }
             }
             MotionEvent.ACTION_UP -> {
-                if (!dragged && downIndex >= 0 && downIndex < candidates.size) {
-                    listener?.onPickCandidate(downIndex, candidates[downIndex])
+                if (!dragged) {
+                    if (downIndex >= 0 && downIndex < candidates.size) {
+                        listener?.onPickCandidate(downIndex, candidates[downIndex])
+                    } else if (downOnComposing && composing.isNotEmpty()) {
+                        // Sentinel index -1 tells the IME to commit the raw composing text
+                        // exactly as shown in the label (Vietnamese quốc ngữ, no conversion).
+                        listener?.onPickCandidate(-1, composing)
+                    }
                 }
                 pressedIndex = -1
+                downOnComposing = false
                 invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
                 pressedIndex = -1
+                downOnComposing = false
                 invalidate()
             }
         }

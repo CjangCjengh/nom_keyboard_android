@@ -236,6 +236,21 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
     // ============================ Candidate selection ============================
 
     override fun onPickCandidate(index: Int, text: String) {
+        // A tap on the composing label (left-most area of the bar) is signalled by index = -1.
+        // In that case we commit the raw Vietnamese quốc-ngữ text exactly as the user typed
+        // it, without bumping any Nom-character recency counter (it isn't a Nom pick).
+        if (index < 0) {
+            // Use the trimmed form so we don't leak the internal syllable-separator space
+            // (see commitComposing for the same rationale).
+            val raw = text.trimEnd()
+            if (raw.isNotEmpty()) {
+                currentInputConnection?.commitText(raw, 1)
+            }
+            composing = ""
+            currentCandidates = emptyList()
+            updateComposing()
+            return
+        }
         currentInputConnection?.commitText(text, 1)
         bumpRecent(text)
         composing = ""

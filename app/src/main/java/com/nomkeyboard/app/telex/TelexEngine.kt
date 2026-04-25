@@ -238,8 +238,13 @@ object TelexEngine {
         // 2. Tone marks (lowercase trigger keys s/f/r/x/j/z)
         val lowerCh = ch.lowercaseChar()
         val tone = toneTriggers[lowerCh]
-        // Only trigger if the buffer already contains a vowel to attach the tone to
-        if (tone != null && composing.any { it.isVowelLike() }) {
+        // Only trigger if the buffer already contains a vowel to attach the tone to AND the
+        // last syllable looks like a valid Vietnamese one. The latter check is important
+        // because real Telex engines (Unikey / Gboard) refuse to place a tone on a syllable
+        // whose structure is obviously invalid – e.g. two disjoint vowel clusters separated
+        // by a consonant like "nếuma" – and instead emit the trigger letter literally so the
+        // user can keep typing foreign words / run-on syllables transparently.
+        if (tone != null && composing.any { it.isVowelLike() } && isLastSyllablePhonotacticallyValid(composing)) {
             val idx = findToneTargetIndex(composing)
             if (idx >= 0) {
                 val v = composing[idx]
@@ -256,6 +261,45 @@ object TelexEngine {
 
         // 3. Default: append the character as-is
         return composing + ch
+    }
+
+    /**
+     * Cheap phonotactic sanity-check on the last syllable (portion of [composing] after the
+     * most recent non-letter character). A well-formed Vietnamese syllable has at most ONE
+     * contiguous vowel cluster – structure is (C1) V+ (C2), where V+ can be up to three
+     * vowels (as in "khuya", "ngoài") but never interrupted by a consonant.
+     *
+     * When the last syllable contains two or more separate vowel runs (e.g. "nếuma" with the
+     * runs "ếu" and "a" split by 'm'), the user is clearly typing past a syllable boundary
+     * that they forgot to delimit with a space – or typing a non-Vietnamese word. In both
+     * cases a tone trigger should NOT retroactively decorate the earlier vowel; instead the
+     * trigger letter must pass through literally so the user can type words like "nếumaf"
+     * or "banmaf" without the IME interfering.
+     *
+     * Also returns false when the last syllable is empty (no letters), because there's
+     * nothing sensible to attach a tone to.
+     */
+    private fun isLastSyllablePhonotacticallyValid(composing: String): Boolean {
+        // Find the start of the last syllable (skip back through letters).
+        var start = composing.length
+        for (i in composing.indices.reversed()) {
+            if (!composing[i].isLetter()) break
+            start = i
+        }
+        if (start >= composing.length) return false
+        var vowelRuns = 0
+        var inVowel = false
+        for (i in start until composing.length) {
+            val v = composing[i].isVowelLike()
+            if (v && !inVowel) {
+                vowelRuns++
+                if (vowelRuns >= 2) return false
+            }
+            inVowel = v
+        }
+        // Exactly one vowel run means a canonical Vietnamese syllable shape; zero vowels
+        // (all consonants) means there's no place for a tone so we still return false.
+        return vowelRuns == 1
     }
 
     /**
