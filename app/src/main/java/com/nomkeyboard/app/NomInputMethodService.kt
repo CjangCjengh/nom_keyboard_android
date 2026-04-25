@@ -197,6 +197,28 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             updateComposing()
             return
         }
+        // If the current composing buffer has NO Nom candidates whatsoever, there is nothing
+        // to gain by staying in composing mode – the user has typed a word the dictionary
+        // doesn't know (could be a name, a foreign word, or simply not in our corpus). In
+        // that case we commit the plain Vietnamese text immediately and emit a real space,
+        // so the text field doesn't show a lingering underline / composing highlight.
+        //
+        // We peek the dictionary directly (bypassing the prefix-completion branch that
+        // [NomDictionary.lookup] also consults) because prefix completions are interesting
+        // while the user is still typing but NOT a reason to keep the composing zone alive
+        // after they pressed space.
+        val trimmed = composing.trim()
+        val hasExactCandidate = trimmed.isNotEmpty() && (
+                NomDictionary.lookupWord(trimmed).isNotEmpty() ||
+                        NomDictionary.lookupSingle(trimmed).isNotEmpty()
+                )
+        if (!hasExactCandidate) {
+            currentInputConnection?.commitText(trimmed, 1)
+            composing = ""
+            currentInputConnection?.commitText(" ", 1)
+            updateComposing()
+            return
+        }
         // Otherwise: extend the composing buffer with a syllable separator.
         composing += " "
         updateComposing()

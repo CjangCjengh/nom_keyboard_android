@@ -193,16 +193,17 @@ object TelexEngine {
             }
         }
 
-        // 1a. "w" does not need to be immediately preceded by o/u: it rewrites the most recent
-        //     o/u/O/U in the current syllable. See [rewriteHornForW] for the full rules
-        //     (including the "uo" -> "ươ" diphthong special case, also applied when only the
-        //     'o' is the most-recent target).
-        //
-        //     If there is no o/u to rewrite (e.g. the syllable is "ng" + 'w'), we fall back to
-        //     appending a standalone "ư" – matching the behaviour of the standalone-'w'
-        //     shortcut above.
+        // 1a. The 'w' key is overloaded – horn/breve/undo/literal – all the rules live in
+        //     [rewriteHornForW]. In brief:
+        //        * syllable contains a plain u/o/a -> add horn/breve to the nearest one;
+        //        * syllable already contains a w-produced modified vowel (ă/ơ/ư, untoned)
+        //          -> undo that merge and append a literal 'w' (e.g. "băn" + w -> "banw");
+        //        * syllable contains a non-w modified vowel (â/ê/ô) or a toned vowel
+        //          -> just append a literal 'w';
+        //        * nothing letter-like in the syllable -> append a standalone "ư"
+        //          (covers "ng" + w -> "ngư").
         if (ch == 'w' || ch == 'W') {
-            val rewritten = rewriteHornForW(composing)
+            val rewritten = rewriteHornForW(composing, triggerUpper = ch == 'W')
             if (rewritten != null) return rewritten
             return composing + if (ch == 'W') 'Ư' else 'ư'
         }
@@ -273,20 +274,31 @@ object TelexEngine {
 
     /**
      * Apply the appropriate "w"-trigger rewrite. The Telex 'w' key is overloaded:
+     *   - Standalone (no prior letters) -> append ư.
      *   - After (or within a syllable containing) u/o, it adds the horn: u -> ư, o -> ơ.
      *     When the target is 'o' and the immediately preceding char is 'u', both get the horn
      *     (the "uo" diphthong becomes "ươ").
      *   - After (or within a syllable containing) 'a'/'A', it adds the breve: a -> ă.
-     *     This is the standard Telex "aw" rule, and we apply it long-distance too so that
-     *     "ban" + w -> "băn", "tram" + w -> "trăm", etc.
-     *   - Otherwise, null is returned and the caller falls back to appending a standalone ư.
+     *   - If the syllable ALREADY contains a w-produced modified vowel (ă/ơ/ư plus uppercase
+     *     variants, without any tone), the new 'w' press undoes that merge – so "băn"+w
+     *     becomes "banw" (user presses the trigger twice to get back the literal two-letter
+     *     form). This matches Unikey's "restore original" behaviour extended to the whole
+     *     syllable.
+     *   - If the syllable contains an unrelated modified vowel (â/ê/ô) or a toned vowel, we
+     *     stop scanning and append a literal 'w' – the user has clearly moved on from the
+     *     horn/breve decision.
+     *   - If no letter is present in the current syllable at all, fall back to appending a
+     *     standalone ư.
      *
-     * The scan is bounded by the current syllable: it stops at the first non-letter char.
-     * The case of the produced modified vowel follows the case of the scanned source vowel,
-     * independent of whether the user pressed 'w' or 'W'.
+     * Scanning is bounded by the current syllable: we stop at the first non-letter char.
+     * The case of the produced vowel follows the case of the scanned source vowel, not the
+     * case of the 'w' trigger itself.
+     *
+     * Returns null when the caller should fall back to the "append standalone ư" branch.
      */
-    private fun rewriteHornForW(composing: String): String? {
-        // Case 1: consecutive "uo" at the tail – rewrite both to ươ.
+    private fun rewriteHornForW(composing: String, triggerUpper: Boolean): String? {
+        // Case 1: consecutive "uo" at the tail – rewrite both to ươ. This remains a direct
+        // two-character merge, independent of any long-distance rules.
         if (composing.length >= 2) {
             val c1 = composing[composing.length - 2]
             val c2 = composing[composing.length - 1]
@@ -298,19 +310,52 @@ object TelexEngine {
             }
         }
 
-        // Case 2: scan backwards for the most recent modifiable vowel (o/u for horn,
-        // a for breve) that is still inside the current syllable; we stop at a non-letter
-        // boundary. The target vowel does not have to be at the very end – e.g.:
-        //     "nguoi" + w -> "ngươi"   (horn on the u-o diphthong, found via the 'o' target)
-        //     "ban"   + w -> "băn"     (breve on 'a')
-        //     "trams" + w -> "trăms"   (we skip 's' and 'm' and find 'a')
+        val literalW: Char = if (triggerUpper) 'W' else 'w'
+
+        // Case 2: bulk undo. If the current syllable already contains ANY w-produced modified
+        // vowel (ă/ơ/ư, no tone), revert ALL of them in a single keystroke and append a
+        // literal 'w'. This way pressing 'w' a second time gives back the exact letter
+        // sequence the user originally typed:
+        //     "băn"   + w -> "banw"
+        //     "ngươi" + w -> "nguoiw"   (both ư and ơ revert together)
+        //     "tư"    + w -> "tuw"
+        // We find the syllable boundary first (stopping at any non-letter), then do a single
+        // pass replacement over that slice.
+        val syllableStart = run {
+            var idx = composing.length
+            for (i in composing.indices.reversed()) {
+                if (!composing[i].isLetter()) break
+                idx = i
+            }
+            idx
+        }
+        val syllable = composing.substring(syllableStart)
+        if (syllable.any { it in "ăĂơƠưƯ" }) {
+            val sb = StringBuilder(syllable.length)
+            for (c in syllable) {
+                sb.append(
+                    when (c) {
+                        'ă' -> 'a'; 'Ă' -> 'A'
+                        'ơ' -> 'o'; 'Ơ' -> 'O'
+                        'ư' -> 'u'; 'Ư' -> 'U'
+                        else -> c
+                    }
+                )
+            }
+            return composing.substring(0, syllableStart) + sb.toString() + literalW
+        }
+
+        // Case 3: apply. Scan backwards across the syllable, adding the appropriate diacritic
+        // to the first plain u/o/a we find. If we meet a non-w modified vowel (â/ê/ô) or a
+        // toned vowel first, the syllable's nucleus is already decorated – in that case just
+        // append a literal 'w'. This mirrors Gboard / Unikey behaviour.
         for (i in composing.indices.reversed()) {
             val c = composing[i]
             if (!c.isLetter()) break
             when (c) {
+                // ---- Apply: a plain u/o/a receives the appropriate diacritic ----
                 'o', 'O' -> {
-                    // Check whether the preceding character is u/U – if so, apply the horn
-                    // diacritic to both characters (e.g. "nguoi" + w -> "ngươi").
+                    // If the preceding character is u/U, both get the horn (diphthong "ươ").
                     if (i > 0) {
                         val prev = composing[i - 1]
                         if (prev == 'u' || prev == 'U') {
@@ -327,9 +372,31 @@ object TelexEngine {
                 'U' -> return composing.substring(0, i) + 'Ư' + composing.substring(i + 1)
                 'a' -> return composing.substring(0, i) + 'ă' + composing.substring(i + 1)
                 'A' -> return composing.substring(0, i) + 'Ă' + composing.substring(i + 1)
+                else -> {
+                    if (isNonWModifiedVowel(c)) {
+                        // Syllable nucleus is already decorated – append a literal 'w'.
+                        return composing + literalW
+                    }
+                    // Plain consonant – keep scanning further back.
+                }
             }
         }
         return null
+    }
+
+    /**
+     * Returns true if [c] is a vowel that carries a diacritic NOT produced by the 'w' trigger
+     * (i.e. circumflex â/ê/ô, or any toned variant of any vowel). Encountering such a vowel
+     * while scanning for a 'w' rewrite means the syllable's vowel has already been fully
+     * decorated, and the incoming 'w' should be taken literally.
+     */
+    private fun isNonWModifiedVowel(c: Char): Boolean {
+        // Circumflex vowels (â/ê/ô and uppercase)
+        if (c in "âÂêÊôÔ") return true
+        // Any vowel carrying a tone – look it up in the reverse tone table; a non-zero tone
+        // index means it is toned (and therefore already 'committed' for that syllable).
+        val entry = toneReverse[c] ?: return false
+        return entry.second != 0
     }
 
     /**
