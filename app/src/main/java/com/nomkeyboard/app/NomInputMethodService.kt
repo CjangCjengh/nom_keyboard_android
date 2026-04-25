@@ -144,6 +144,20 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             newSelStart, newSelEnd,
             candidatesStart, candidatesEnd
         )
+        // Detect a genuine caret move that is NOT caused by our own setComposingText:
+        //   - candidatesStart < 0 means the framework reports no active composing region for
+        //     this update (i.e. it's a selection-only change, typically a user tap or an
+        //     arrow-key navigation in the host editor).
+        //   - The selection indices actually changed compared to the previous report.
+        // When that happens while we still have a pending composing buffer, the user clearly
+        // walked away from the word they were typing. Commit it as plain Vietnamese (same
+        // behaviour as tapping the left-side composing label on the candidate bar) so the
+        // text field isn't left with a dangling composing underline in a now-unrelated place.
+        val caretMoved = newSelStart != oldSelStart || newSelEnd != oldSelEnd
+        if (composing.isNotEmpty() && candidatesStart < 0 && caretMoved) {
+            commitComposing()
+            return
+        }
         // Caret jumped elsewhere (not a composing-text update). Re-evaluate auto-capitalisation
         // because the user may have tapped to position the caret at the start of a new line.
         if (composing.isEmpty() && candidatesStart < 0) {
