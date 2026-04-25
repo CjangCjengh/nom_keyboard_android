@@ -124,13 +124,20 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
     override fun onChar(ch: Char) {
         playKeyClickSound()
         if (!ch.isLetter() && ch != '\'' && ch != '-') {
-            // Non-letter: commit current composing first, then insert the raw symbol
+            // Non-letter punctuation: commit whatever composing text we have as plain Vietnamese
+            // (so we stay fully compatible with Quốc Ngữ typing) and then insert the raw symbol.
             commitComposing()
             currentInputConnection?.commitText(ch.toString(), 1)
             return
         }
-        // Apply Telex transformation
-        composing = TelexEngine.apply(composing, ch)
+        // The composing buffer may contain multiple space-separated syllables (e.g. "anh "
+        // -> typing 'q' yields "anh q"). Telex rules only apply to the last syllable, so we
+        // split, transform the tail, then stitch back together.
+        val lastSpace = composing.lastIndexOf(' ')
+        val head = if (lastSpace >= 0) composing.substring(0, lastSpace + 1) else ""
+        val tail = if (lastSpace >= 0) composing.substring(lastSpace + 1) else composing
+        val newTail = TelexEngine.apply(tail, ch)
+        composing = head + newTail
         updateComposing()
     }
 
@@ -162,26 +169,37 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
 
     override fun onSpace() {
         playKeyClickSound()
-        // Space behaviour:
-        //   - If there is no composing buffer: just insert a literal space.
-        //   - If the user is composing AND we have at least one Nom candidate: pick the first
-        //     candidate (the "best guess") and commit it, WITHOUT appending a space – the user
-        //     is likely trying to keep typing another syllable of a multi-syllable word. A
-        //     second space press (with an empty buffer) will then insert the literal space.
-        //   - If the user is composing but there is NO Nom candidate: commit the plain
-        //     Vietnamese text and insert a space, as a graceful fallback.
+        // Space behaviour (designed to be fully Quốc-Ngữ friendly, i.e. typing pure Vietnamese
+        // sentences keeps working transparently):
+        //
+        //   - If the composing buffer is empty: just insert a literal space.
+        //   - If the composing buffer ends with the last syllable still being typed (e.g. "anh"):
+        //     DO NOT pick a candidate and DO NOT leave the composing zone. Instead, append a
+        //     space to the composing buffer ("anh "). The text field still shows the whole
+        //     buffer with the Android composing underline, and the candidate bar now looks up
+        //     the multi-syllable compound (e.g. "anh quoc" -> 英國 once the user types more).
+        //   - If the composing buffer already ends with a space ("anh ") and the user presses
+        //     space AGAIN without typing anything in between: the user clearly wants a real
+        //     space in the text – commit the composing text (minus the trailing space we were
+        //     holding) as plain Vietnamese, then emit the literal space.
         if (composing.isEmpty()) {
             currentInputConnection?.commitText(" ", 1)
-        } else if (currentCandidates.isNotEmpty()) {
-            val best = currentCandidates[0]
-            currentInputConnection?.commitText(best, 1)
-            bumpRecent(best)
-            composing = ""
-            updateComposing()
-        } else {
-            commitComposing()
-            currentInputConnection?.commitText(" ", 1)
+            return
         }
+        if (composing.endsWith(' ')) {
+            // Double-space: commit what we have and emit a literal space.
+            val text = composing.trimEnd()
+            if (text.isNotEmpty()) {
+                currentInputConnection?.commitText(text, 1)
+            }
+            composing = ""
+            currentInputConnection?.commitText(" ", 1)
+            updateComposing()
+            return
+        }
+        // Otherwise: extend the composing buffer with a syllable separator.
+        composing += " "
+        updateComposing()
     }
     override fun onSymbol(text: String) {
         commitComposing()
@@ -228,7 +246,14 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
 
     private fun commitComposing() {
         if (composing.isEmpty()) return
-        currentInputConnection?.commitText(composing, 1)
+        // Trim the trailing syllable-separator space we may have appended when the user hit
+        // SPACE between syllables but then jumped out of the composing zone via Enter /
+        // punctuation / language switch etc. We don't want to leak that internal separator
+        // into the final committed text.
+        val text = composing.trimEnd()
+        if (text.isNotEmpty()) {
+            currentInputConnection?.commitText(text, 1)
+        }
         composing = ""
         candidateBar.clear()
         currentInputConnection?.finishComposingText()

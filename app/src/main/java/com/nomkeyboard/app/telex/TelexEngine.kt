@@ -24,6 +24,18 @@ package com.nomkeyboard.app.telex
  */
 object TelexEngine {
 
+    // Two-character diphthong rewrites produced by typing an 'o' AFTER a horn vowel:
+    //   ư + o -> ươ,  Ư + o -> Ươ,  ư + O -> ưO? (we prefer matching case of the trigger)
+    // This is needed because a user who already typed "ư" (e.g. via the standalone-'w'
+    // shortcut) and then types 'o' expects the standard Vietnamese diphthong "ươ", not the
+    // literal two characters "ưo". The same applies to the uppercase variants.
+    private val hornFollowUp: Map<Pair<Char, Char>, String> = mapOf(
+        'ư' to 'o' to "ươ",
+        'Ư' to 'o' to "Ươ",
+        'ư' to 'O' to "ưƠ",
+        'Ư' to 'O' to "ƯƠ",
+    )
+
     // Double-letter vowel modifiers: (existingChar, triggerChar) -> mergedChar.
     // NOTE: "uw" / "ow" work even when the 'u' / 'o' is not the last character of the buffer,
     // because real Vietnamese Telex rewrites the most recent matching vowel – that logic lives
@@ -109,8 +121,8 @@ object TelexEngine {
      * If [ch] does not trigger any transformation, the result is simply [composing] + [ch].
      */
     fun apply(composing: String, ch: Char): String {
-        // "w" typed on its own (no prior letters or after a non-letter) expands to "ư" – a
-        // very common shortcut most Vietnamese Telex engines provide.
+        // "w" typed on its own (no prior letters, at word start, or after a non-letter) expands
+        // to "ư" – a very common shortcut most Vietnamese Telex engines provide.
         if ((ch == 'w' || ch == 'W') && (composing.isEmpty() || !composing.last().isLetter())) {
             val merged = if (ch == 'W') 'Ư' else 'ư'
             return composing + merged
@@ -122,13 +134,24 @@ object TelexEngine {
         //     o/u/O/U in the current syllable. This lets the user type "nguoi" then "w" to get
         //     "nguơi" (rewrite the trailing 'o' to 'ơ'), or "uo" + "w" to get "ươ"
         //     (both the 'u' and 'o' of the "uo" diphthong get their horn marks).
+        //
+        //     If there is no o/u to rewrite (e.g. the syllable is "ng" + 'w'), we fall back to
+        //     appending a standalone "ư" – matching the behaviour of the standalone-'w'
+        //     shortcut above.
         if (ch == 'w' || ch == 'W') {
             val rewritten = rewriteHornForW(composing)
             if (rewritten != null) return rewritten
+            return composing + if (ch == 'W') 'Ư' else 'ư'
         }
 
-        // 1b. Vowel modifier (double-letter merge): last char + ch forms a modifier pair
+        // 1b. Horn follow-up: if the user already has a horn vowel (ư/Ư) at the tail and then
+        //     types 'o'/'O', form the diphthong "ươ" / "Ươ" / "ưƠ" / "ƯƠ" automatically.
         val last = composing.last()
+        hornFollowUp[last to ch]?.let { merged ->
+            return composing.dropLast(1) + merged
+        }
+
+        // 1c. Vowel modifier (double-letter merge): last char + ch forms a modifier pair
         val pairKey = last to ch
         vowelMod[pairKey]?.let { merged ->
             // replace the last character with the merged one
