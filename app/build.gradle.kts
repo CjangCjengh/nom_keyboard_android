@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("com.android.application") version "8.5.2" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.25" apply false
 }
 
 android {
@@ -15,9 +15,26 @@ android {
         versionName = "1.0.0"
     }
 
-    // 12MB 的字体不要被打包工具压缩，否则运行时 AssetFileDescriptor 无法 mmap
+    // Keep the 12MB font uncompressed so that AssetFileDescriptor can mmap it at runtime.
     androidResources {
         noCompress += listOf("ttf", "tsv", "txt")
+    }
+
+    // Release signing config: read the key info from keystore.properties in the project root.
+    // If the file is missing, the release build falls back to the debug signing config for local testing.
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    val releaseSigning = if (keystorePropsFile.exists()) {
+        val props = java.util.Properties().apply {
+            keystorePropsFile.inputStream().use { load(it) }
+        }
+        signingConfigs.create("release") {
+            storeFile = rootProject.file(props.getProperty("storeFile"))
+            storePassword = props.getProperty("storePassword")
+            keyAlias = props.getProperty("keyAlias")
+            keyPassword = props.getProperty("keyPassword")
+        }
+    } else {
+        null
     }
 
     buildTypes {
@@ -27,6 +44,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = releaseSigning ?: signingConfigs.getByName("debug")
         }
         debug {
             isMinifyEnabled = false

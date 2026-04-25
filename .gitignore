@@ -1,4 +1,4 @@
-# 默认 Android gitignore
+# Android gitignore
 *.iml
 .gradle
 /local.properties
@@ -15,3 +15,7 @@ local.properties
 /app/release/
 /app/debug/
 /app/build/
+
+*.jks
+*.keystore
+keystore.properties
