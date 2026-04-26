@@ -694,7 +694,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             // "bệnh" (edit distance 1) rather than "bịnh" (distance 2) or
             // "bạnh" (distance 2) – see [NomDictionary.pickClosestReadingForNom].
             val needsTailRecovery = !consumedTail.contains(' ') && text.length == 1 &&
-                !NomDictionary.isLegalReadingForNom(text, consumedTail)
+                    !NomDictionary.isLegalReadingForNom(text, consumedTail)
             val tailLearnKey = if (needsTailRecovery)
                 NomDictionary.pickClosestReadingForNom(text, consumedTail)
             else ""
@@ -731,7 +731,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                         val origAsciiNoSp = NomDictionary
                             .stripDiacritics(origKey.lowercase()).replace(" ", "")
                         origAsciiNoSp.startsWith(consumedTailAsciiNoSp) &&
-                            origAsciiNoSp.length >= consumedTailAsciiNoSp.length
+                                origAsciiNoSp.length >= consumedTailAsciiNoSp.length
                     }?.first
             } else null
             val effectiveTailLearnKey = tailBundledKey ?: tailUserKey ?: tailLearnKey
@@ -745,7 +745,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                     rawConsumed = consumedTail,
                     nomText = text,
                     isShorthand = needsTailRecovery || tailBundledKey != null ||
-                        tailUserKey != null,
+                            tailUserKey != null,
                     learnKey = effectiveTailLearnKey,
                 )
             )
@@ -776,7 +776,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // the closest legal reading by edit distance (tie-broken by dictionary
         // order). See the final-pick comment for the full rationale.
         val needsPartialRecovery = !consumedRaw.contains(' ') && text.length == 1 &&
-            !NomDictionary.isLegalReadingForNom(text, consumedRaw)
+                !NomDictionary.isLegalReadingForNom(text, consumedRaw)
         val partialLearnKey = if (needsPartialRecovery)
             NomDictionary.pickClosestReadingForNom(text, consumedRaw)
         else ""
@@ -802,7 +802,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                     val origAsciiNoSp = NomDictionary
                         .stripDiacritics(origKey.lowercase()).replace(" ", "")
                     origAsciiNoSp.startsWith(consumedRawAsciiNoSp) &&
-                        origAsciiNoSp.length >= consumedRawAsciiNoSp.length
+                            origAsciiNoSp.length >= consumedRawAsciiNoSp.length
                 }?.first
         } else null
         val effectivePartialLearnKey = partialBundledKey ?: partialUserKey ?: partialLearnKey
@@ -811,7 +811,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                 rawConsumed = consumedRaw,
                 nomText = text,
                 isShorthand = needsPartialRecovery || partialBundledKey != null ||
-                    partialUserKey != null,
+                        partialUserKey != null,
                 learnKey = effectivePartialLearnKey,
             )
         )
@@ -934,7 +934,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             currentCandidateConsumed = consumed
             currentShorthandOrigKeys = emptyArray()
         } else {
-            val singleOnly = prefs.getBoolean("pref_single_syl_single_char_only", false)
+            val singleOnly = prefs.getBoolean("pref_single_syl_single_char_only", true)
             val isSingleSyllable = !composing.contains(' ')
             // Strict mode when the user has turned lenient matching off. Propagated
             // into every lookup path so tone-stripped user entries don't leak across
@@ -1317,7 +1317,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             // [NomDictionary], so "quoc gia" won't re-learn "國家" that's already keyed
             // under "quốc gia" in the bundle.
             val alreadyBundled = NomDictionary.bundledWordContains(s.key, s.nom) ||
-                NomDictionary.bundledSingleContains(s.key, s.nom)
+                    NomDictionary.bundledSingleContains(s.key, s.nom)
             if (alreadyBundled) continue
             val prev = existing[s.key].orEmpty()
             val merged = LinkedHashSet<String>()

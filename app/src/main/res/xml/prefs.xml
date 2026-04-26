@@ -29,7 +29,7 @@
         android:key="pref_single_syl_single_char_only"
         android:title="@string/pref_single_syl_single_char_only"
         android:summary="@string/pref_single_syl_single_char_only_summary"
-        android:defaultValue="false" />
+        android:defaultValue="true" />
 
     <SwitchPreferenceCompat
         android:key="pref_shorthand"
