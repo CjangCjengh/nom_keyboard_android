@@ -939,7 +939,8 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             // Strict mode when the user has turned lenient matching off. Propagated
             // into every lookup path so tone-stripped user entries don't leak across
             // toned queries (e.g. `tâm` must NOT match a user-dict `tam: 三`).
-            val strict = !prefs.getBoolean("pref_lenient_match", true)
+            // Default is strict (pref default = false).
+            val strict = !prefs.getBoolean("pref_lenient_match", false)
             val flat = if (singleOnly && isSingleSyllable) {
                 // Single-syllable-only mode: restrict to single-character hits so we
                 // never surface compounds like 國家 just because the user typed "qu".
@@ -1156,7 +1157,8 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         if (syllables.isEmpty()) return Pair(emptyList(), IntArray(0))
         // Strict mode forwarded into every lookup so lenient-off actually suppresses
         // tone-insensitive user-dict hits. See [updateComposing] for rationale.
-        val strict = !prefs.getBoolean("pref_lenient_match", true)
+        // Default is strict (pref default = false).
+        val strict = !prefs.getBoolean("pref_lenient_match", false)
         // consumedFor[text] = best (= largest) consumed count we've seen for this text.
         val consumedFor = LinkedHashMap<String, Int>()
         for (k in syllables.size downTo 1) {

@@ -16,7 +16,6 @@ A modernised Hán Nôm input method for Android. The UI has been redesigned to l
   - Tone marks: `s` (sắc), `f` (huyền), `r` (hỏi), `x` (ngã), `j` (nặng), `z` (clear tone)
   - Old (`hóa`, `thúy`) vs. new (`hoá`, `thuý`) tone-mark placement is configurable in Settings.
 - **Live Hán Nôm suggestions**: single-syllable dictionary of **6,686** syllables with **25,059** candidates, plus a compound-word dictionary of **1,636** entries (flattened into **2,648** lookup keys). Tap any candidate to commit.
-- **Diacritic-tolerant lookup**: both fully-toned and plain-ASCII queries resolve to the right candidates. For example `chunom`, `chữ nôm`, `chữnôm` all yield **𡦂喃 / 𡨸喃**; `vietnam` → **越南**; `hànội` → **河內**.
 - **Segment-by-segment conversion**: type several syllables at once and the keyboard splits them into segments to pick one after another; the whole phrase is committed only after every segment is chosen. Configurable under **Settings ▸ Space bar behaviour**.
 - **Viết tắt (abbreviated input)**: when what you typed cannot be a normal Vietnamese syllable (e.g. `nhma`, `nch`), the keyboard auto-splits it into syllable prefixes and suggests compound words that match segment by segment.
 - **Context-aware n-gram learning**: every committed sequence of Hán Nôm characters is remembered as 1-gram … N-gram frequencies (N adjustable, 1–6) and re-ranks future suggestions based on what you've just typed. A freshly typed compound is automatically registered as a new candidate for next time.

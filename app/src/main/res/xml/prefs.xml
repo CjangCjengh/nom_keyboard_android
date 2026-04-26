@@ -41,7 +41,7 @@
         android:key="pref_lenient_match"
         android:title="@string/pref_lenient_match"
         android:summary="@string/pref_lenient_match_summary"
-        android:defaultValue="true" />
+        android:defaultValue="false" />
 
     <SwitchPreferenceCompat
         android:key="pref_auto_learn_segment"
