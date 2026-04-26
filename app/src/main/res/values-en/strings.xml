@@ -20,7 +20,7 @@
     <string name="pref_single_syl_single_char_only">Single-syllable → single char only</string>
     <string name="pref_single_syl_single_char_only_summary">When you have typed only one syllable (or part of one), show single-character Nom candidates only; multi-character words will appear only once you have entered enough syllables</string>
     <string name="pref_shorthand">Viết tắt</string>
-    <string name="pref_shorthand_summary">When what you\'ve typed cannot be a normal Vietnamese syllable (e.g. qg, nma, tsao), the keyboard auto-splits it into syllable prefixes (q\'g, n\'ma, t\'sao) and suggests compound words that match segment-by-segment (qg → 國家, nma → 但) as well as single-character candidates for the first segment.</string>
+    <string name="pref_shorthand_summary">When what you\'ve typed cannot be a normal Vietnamese syllable (e.g. nhma, nch), the keyboard auto-splits it into syllable prefixes (nh\'ma, n\'ch) and suggests compound words that match segment-by-segment, as well as single-character candidates for the first segment.</string>
     <string name="pref_ngram_n">N-gram learning length</string>
     <string name="pref_ngram_n_summary">How many consecutive Nom characters the keyboard learns to give smarter context-aware suggestions</string>
     <string name="pref_ngram_export">Export n-gram frequencies</string>

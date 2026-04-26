@@ -20,7 +20,7 @@
     <string name="pref_single_syl_single_char_only">Âm tiết đơn chỉ gợi ý đơn tự</string>
     <string name="pref_single_syl_single_char_only_summary">Khi đang gõ một âm tiết duy nhất (hoặc một phần của nó), chỉ hiện chữ Hán Nôm đơn tự; các từ ghép nhiều chữ sẽ chỉ xuất hiện khi bạn đã nhập đủ nhiều âm tiết</string>
     <string name="pref_shorthand">Viết tắt</string>
-    <string name="pref_shorthand_summary">Khi chuỗi chữ bạn gõ không thể là một âm tiết tiếng Việt bình thường (ví dụ qg, nma, tsao), bàn phím sẽ tự chia thành các tiền tố âm tiết (q\'g, n\'ma, t\'sao) và gợi ý các từ ghép khớp từng đoạn (như qg → 國家, nma → 但), hoặc chữ Hán Nôm đơn tự cho đoạn đầu tiên.</string>
+    <string name="pref_shorthand_summary">Khi chuỗi chữ bạn gõ không thể là một âm tiết tiếng Việt bình thường (ví dụ nhma, nch), bàn phím sẽ tự chia thành các tiền tố âm tiết (nh\'ma, n\'ch) và gợi ý các từ ghép khớp từng đoạn, hoặc chữ Hán Nôm đơn tự cho đoạn đầu tiên.</string>
     <string name="pref_ngram_n">Độ dài n-gram ghi nhớ</string>
     <string name="pref_ngram_n_summary">Số chữ Hán Nôm liên tiếp mà bàn phím sẽ học để gợi ý thông minh hơn theo ngữ cảnh</string>
     <string name="pref_ngram_export">Xuất tần suất n-gram</string>

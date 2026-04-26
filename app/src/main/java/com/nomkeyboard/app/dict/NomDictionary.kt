@@ -49,6 +49,18 @@ object NomDictionary {
      */
     private val wordsBySyllableCountAndFirstChar: HashMap<String, MutableList<String>> = HashMap(500)
 
+    /**
+     * Reverse index for single-character Nom: `nom_char -> list of ascii readings`.
+     * Built by flattening [singleMap] (which maps reading -> [nom_chars]). Readings
+     * are stored in the order they appear in the dictionary file, which means the
+     * most common reading for a character comes first – exactly what viết tắt
+     * single-char picks need so `learnUserPhrases` can record the real reading
+     * (e.g. "quan" for 關) instead of the raw single-letter shorthand cluster.
+     *
+     * Ascii form is lowercase, diacritic-stripped, space-free (single-syllable only).
+     */
+    private val nomToSingleAsciiReadings: HashMap<String, MutableList<String>> = HashMap(7000)
+
     @Volatile
     private var loaded = false
 
@@ -60,6 +72,7 @@ object NomDictionary {
             loadTsv(context, "nom_dict_single.tsv", singleMap, asciiSingleIndex)
             loadTsv(context, "nom_dict_word.tsv", wordMap, asciiWordIndex)
             buildVietTatIndex()
+            buildNomReverseIndex()
             loaded = true
             Log.i(TAG, "dictionary loaded: single=${singleMap.size}, word=${wordMap.size}, words2syl=${wordsBySyllableCount[2]?.size ?: 0}, cost=${System.currentTimeMillis() - t0}ms")
         }
@@ -87,6 +100,105 @@ object NomDictionary {
         }
     }
 
+    /**
+     * Build the reverse Nom -> ascii-reading index. We walk [singleMap] once and for
+     * every `reading -> [nom_chars]` entry, stash the diacritic-free lowercase form
+     * of the reading under each Nom char along with the character's position in
+     * that reading's value list (0 = most prominent for that reading).
+     *
+     * After collection we sort each reading list by (position asc, insertion order
+     * asc) so the FIRST reading returned is the one where this Nom char occupies
+     * the highest slot in the bundled dictionary – i.e. the "primary" reading for
+     * that character. This gives us a much better fallback than raw HashMap
+     * iteration order when [lookupAsciiReadingForNom] has no compound match to
+     * disambiguate by (e.g. 心 has readings `tim` and `tâm`; because 心 is at
+     * position 0 in tâm's list but position 2 in tim's list, `tam` wins and
+     * shorthand learning records "quan tam" -> 關心 instead of "quan tim").
+     */
+    private fun buildNomReverseIndex() {
+        // Temp: nom -> list of (asciiReading, position, insertionOrder)
+        data class Entry(val ascii: String, val position: Int, val order: Int)
+        val temp = HashMap<String, ArrayList<Entry>>(7000)
+        var order = 0
+        for ((reading, noms) in singleMap) {
+            val ascii = stripDiacritics(reading.lowercase()).trim()
+            if (ascii.isEmpty()) continue
+            for ((pos, nom) in noms.withIndex()) {
+                val list = temp.getOrPut(nom) { ArrayList(2) }
+                // Keep only the best (lowest) position per ascii reading to dedup
+                // entries that share the same ascii form (e.g. tâm and tấm both
+                // stripped to `tam`).
+                val existing = list.indexOfFirst { it.ascii == ascii }
+                if (existing >= 0) {
+                    val old = list[existing]
+                    if (pos < old.position) list[existing] = Entry(ascii, pos, old.order)
+                } else {
+                    list.add(Entry(ascii, pos, order++))
+                }
+            }
+        }
+        for ((nom, entries) in temp) {
+            entries.sortWith(compareBy({ it.position }, { it.order }))
+            val out = ArrayList<String>(entries.size)
+            for (e in entries) out.add(e.ascii)
+            nomToSingleAsciiReadings[nom] = out
+        }
+    }
+
+    /**
+     * Pick an ascii reading (lowercase, diacritic-free, single-syllable) for the given
+     * single-character Nom [nom]. When [preferPrefix] is non-empty, readings that
+     * start with it are preferred – this lets shorthand single-char picks recover the
+     * full reading that matches the letter segment the user originally typed (e.g.
+     * typing `q` then picking 關 returns "quan" because 關 has readings "quan" ranked
+     * first in the bundled dictionary).
+     *
+     * [compoundPrefixReading] is an additional disambiguator: when set, we look up
+     * `"<compoundPrefixReading> <candidate_reading>"` in the compound dictionary and
+     * prefer readings that produce a known compound. This is how shorthand tails
+     * recover the CORRECT single-char reading when the char has multiple readings
+     * (e.g. 心 has readings `tim` and `tâm`; after picking 關 for "q" we want `tâm`
+     * because 關心 = "quan tâm" is a known compound, not `tim`). If no compound
+     * match is found we fall back to the prefix-based ordering.
+     *
+     * Returns empty string if no reading is known for [nom] (e.g. multi-char word or
+     * a character that only appears in the compound dictionary).
+     */
+    fun lookupAsciiReadingForNom(
+        nom: String,
+        preferPrefix: String = "",
+        compoundPrefixReading: String = ""
+    ): String {
+        if (nom.isEmpty()) return ""
+        val readings = nomToSingleAsciiReadings[nom] ?: return ""
+        if (readings.isEmpty()) return ""
+        val p = if (preferPrefix.isEmpty()) ""
+        else stripDiacritics(preferPrefix.lowercase())
+        // First pass (preferred): a reading that (a) starts with [preferPrefix] if
+        // given AND (b) forms a known compound with [compoundPrefixReading] that
+        // actually contains [nom] in its value list. This is the strongest signal
+        // that we've guessed the right reading.
+        if (compoundPrefixReading.isNotEmpty()) {
+            val cp = stripDiacritics(compoundPrefixReading.lowercase()).trim()
+            if (cp.isNotEmpty()) {
+                for (r in readings) {
+                    if (p.isNotEmpty() && !r.startsWith(p)) continue
+                    val compoundKey = "$cp $r"
+                    val values = wordMap[compoundKey]
+                        ?: asciiWordIndex[compoundKey]?.firstNotNullOfOrNull { wordMap[it] }
+                    if (values != null && values.any { it.contains(nom) }) return r
+                }
+            }
+        }
+        // Second pass: prefix-only preference.
+        if (p.isNotEmpty()) {
+            for (r in readings) {
+                if (r.startsWith(p)) return r
+            }
+        }
+        // Fallback: most common reading (dictionary-order first).
+        return readings[0]
+    }
     /**
      * @return true iff [asciiLower] is a prefix of at least one ascii single-syllable
      *   key. Used by the viết tắt splitter to detect "still mid-syllable" inputs so it
@@ -117,10 +229,20 @@ object NomDictionary {
      * typing just `q` still surfaces every single-char candidate that could complete
      * to a real syllable. [prefix] is lowercased and diacritic-stripped internally.
      *
-     * Results keep the bundled dictionary's original ordering (common syllables first)
-     * so popular readings float to the top without extra sorting work on our side.
+     * Ordering:
+     *   1. exact-ascii hits first (these are the "right" pronunciation for what the
+     *      user typed so far),
+     *   2. then longer-prefix hits, sorted by ascii key length ASC then key ASC so
+     *      common short readings (e.g. `qua`, `quan`) come before rarer long ones
+     *      (e.g. `quyệt`) deterministically across HashMap reorderings.
+     *
+     * [limit] is intentionally generous: the candidate strip handles UI-level
+     * truncation (left-swipe + the fullscreen expand arrow), and single-letter
+     * prefixes like `q` would otherwise silently drop common characters (e.g. 關,
+     * ranked 10th in the `quan` values list, was previously missed because the
+     * default cap of 24 was filled up by other q-syllables first).
      */
-    fun lookupSinglePrefix(prefix: String, limit: Int = PREFIX_LIMIT): List<String> {
+    fun lookupSinglePrefix(prefix: String, limit: Int = 500): List<String> {
         if (prefix.isEmpty()) return emptyList()
         val p = stripDiacritics(prefix.lowercase())
         if (p.isEmpty()) return emptyList()
@@ -134,21 +256,25 @@ object NomDictionary {
                 }
             }
         }
-        // Then: sweep the ascii-single index for longer keys that start with p. We
-        // iterate the whole map because the index isn't sorted by key; for ~5000
-        // entries this is cheap enough on every keystroke.
-        for ((asciiKey, origs) in asciiSingleIndex) {
+        // Then: collect all ascii keys that are strictly longer than p and start with
+        // p, sort them deterministically (length ASC, then key ASC) so the candidate
+        // order is stable and short/common readings surface before rare long ones.
+        val longerKeys = ArrayList<String>()
+        for (asciiKey in asciiSingleIndex.keys) {
+            if (asciiKey.length > p.length && asciiKey.startsWith(p)) longerKeys.add(asciiKey)
+        }
+        longerKeys.sortWith(compareBy({ it.length }, { it }))
+        for (asciiKey in longerKeys) {
             if (result.size >= limit) break
-            if (asciiKey.length > p.length && asciiKey.startsWith(p)) {
-                for (orig in origs) {
-                    singleMap[orig]?.let { values ->
-                        for (v in values) {
-                            result.add(v)
-                            if (result.size >= limit) break
-                        }
+            val origs = asciiSingleIndex[asciiKey] ?: continue
+            for (orig in origs) {
+                singleMap[orig]?.let { values ->
+                    for (v in values) {
+                        result.add(v)
+                        if (result.size >= limit) break
                     }
-                    if (result.size >= limit) break
                 }
+                if (result.size >= limit) break
             }
         }
         return result.toList()
@@ -276,6 +402,12 @@ object NomDictionary {
      * and finally – if the caller is still typing – do a prefix search over the compound index
      * so partial inputs such as "anhquo" still surface useful suggestions (e.g. the candidates
      * for "anhquoc" -> 英國) instead of an empty bar.
+     *
+     * For short inputs that aren't yet a full syllable (e.g. just `q`), we also fold in
+     * [lookupSinglePrefix] so every single-char Nom whose reading starts with the typed
+     * letters shows up – otherwise bare-letter prefixes could silently miss characters
+     * that only appear as single-syllable readings (e.g. 關 under `quan`) because the
+     * compound-prefix sweep only looks at multi-syllable words.
      */
     fun lookup(query: String): List<String> {
         if (query.isEmpty()) return emptyList()
@@ -285,6 +417,12 @@ object NomDictionary {
         // User dictionary prefix matches come first so user-added compound completions win.
         merged.addAll(UserDictionary.lookupPrefix(query, PREFIX_LIMIT))
         merged.addAll(lookupPrefix(query, PREFIX_LIMIT))
+        // Fold in single-char prefix hits when the query is still a single (possibly
+        // partial) syllable – otherwise typing just `q` would surface multi-syllable
+        // matches only, hiding every single-character candidate that reads `qu*`.
+        if (!query.contains(' ')) {
+            merged.addAll(lookupSinglePrefix(query))
+        }
         return merged.toList()
     }
 

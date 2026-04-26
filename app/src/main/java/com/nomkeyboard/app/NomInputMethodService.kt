@@ -68,13 +68,23 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         val rawConsumed: String,
         val nomText: String,
         /**
-         * True when this step came from shorthand-mode picking. Shorthand steps never
-         * contribute to the user dictionary (there's no real reading to key on) and
-         * their [rawConsumed] holds the raw letter cluster that was consumed (e.g. the
+         * True when this step came from shorthand-mode picking. For shorthand steps
+         * the [rawConsumed] holds the raw letter cluster that was consumed (e.g. the
          * "q" in [q, g]) so backspace can put it back into the composing buffer
          * verbatim.
          */
         val isShorthand: Boolean = false,
+        /**
+         * Optional user-dictionary learn key. When non-empty, [learnUserPhrases] uses
+         * this (instead of [rawConsumed]) as the Vietnamese reading to register the
+         * Nom output under. We need this because shorthand picks have a
+         * [rawConsumed] that's just a letter cluster (e.g. "vn") which is useless as
+         * a reading; the real reading is the bundled-dictionary key the candidate
+         * came from (e.g. "việt nam"). Empty for plain (non-shorthand) picks where
+         * [rawConsumed] itself is the reading, or for shorthand single-char picks
+         * where no meaningful key is available.
+         */
+        val learnKey: String = "",
     )
     private val lockedHistory: ArrayDeque<LockedStep> = ArrayDeque()
 
@@ -112,6 +122,15 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
      * keep the remaining syllables live for further picking.
      */
     private var currentCandidateConsumed: IntArray = IntArray(0)
+    /**
+     * Parallel array to [currentCandidates] used only in shorthand (viết tắt) mode:
+     * the bundled-dictionary original Vietnamese key each candidate came from (with
+     * diacritics, ascii-only lowercase), so that when the user picks a shorthand
+     * candidate we can learn the mapping under the real reading (e.g. "viet nam" ->
+     * 越南) instead of the raw shorthand cluster (e.g. "vn"). Empty string for
+     * single-char prefix entries where we don't have a dictionary key to key on.
+     */
+    private var currentShorthandOrigKeys: Array<String> = emptyArray()
 
     private val recentCounts = HashMap<String, Int>()
     private lateinit var prefs: SharedPreferences
@@ -281,6 +300,16 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             if (isSentenceTerminator(ch)) NgramModel.resetContext()
             return
         }
+        // Shorthand (viết tắt) bypass: once we're in shorthand mode, Telex diacritic /
+        // tone transformations are out of scope – the buffer is a non-syllabic letter
+        // cluster (e.g. "vn", "tsao") and running a trigger like 's' or 'r' through
+        // Telex would mangle it into something nonsensical. Just append the letter
+        // verbatim and let [updateComposing] re-split the cluster.
+        if (shorthandActive) {
+            composing += ch
+            updateComposing()
+            return
+        }
         // The composing buffer may contain multiple space-separated syllables (e.g. "anh "
         // -> typing 'q' yields "anh q"). Telex rules only apply to the last syllable, so we
         // split, transform the tail, then stitch back together.
@@ -360,7 +389,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
     }
 
     /**
- * Segment mode: space is a **syllable separator** while something is being
+     * Segment mode: space is a **syllable separator** while something is being
      * composed, so that the user can keep stacking syllables ("quoc" SPACE "gia" SPACE
      * "moi" → `quốc gia mới`) and then tap the candidate bar to turn the longest
      * matching compound into Nom. A real space character is only emitted when there is
@@ -371,6 +400,19 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
      */
     private fun onSpaceSegment() {
         if (!hasActiveComposition()) {
+            currentInputConnection?.commitText(" ", 1)
+            NgramModel.resetContext()
+            return
+        }
+        // Shorthand (viết tắt) in flight: hitting space terminates the shorthand run.
+        // The raw letter cluster (e.g. "vn") is NOT a valid Vietnamese syllable so the
+        // normal segment-mode policy of "append a separator and wait for more input"
+        // doesn't make sense – the user clearly wants to move on. Commit the current
+        // composition verbatim (lockedPrefix Nom + raw cluster as-is) and emit a real
+        // space. Without this, the user would have to hit space twice (once to exit
+        // shorthand, once to actually insert the space) which is the bug reported.
+        if (shorthandActive) {
+            commitComposing()
             currentInputConnection?.commitText(" ", 1)
             NgramModel.resetContext()
             return
@@ -518,12 +560,33 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         if (shorthandActive && shorthandSegments.isNotEmpty()) {
             val segs = shorthandSegments
             val kSh = consumed.coerceIn(1, segs.size)
+            // Look up the bundled-dictionary original key for this candidate (if any).
+            // This is the "real" Vietnamese reading (e.g. "việt nam" for 越南 picked via
+            // "vn") that [learnUserPhrases] will key the mapping on. We normalise it to
+            // lowercase + ascii + space-joined so future queries that type the full
+            // reading can find it. Empty string when no reading is available (e.g. the
+            // candidate came from a single-char prefix hit, not a compound lookup).
+            val rawOrigKey = currentShorthandOrigKeys.getOrElse(index) { "" }
+            val learnKey = if (rawOrigKey.isEmpty()) "" else
+                NomDictionary.stripDiacritics(rawOrigKey.lowercase())
+                    .replace(Regex("\\s+"), " ").trim()
             // If this pick covers every remaining segment -> FINAL: commit lockedPrefix +
-            // text and clear all state. No user-dict learning (shorthand has no real
-            // reading to key on) but the n-gram model still learns the character
-            // sequence so future suggestions benefit from it.
+            // text and clear all state. The n-gram model learns the character sequence;
+            // [learnUserPhrases] picks up any step that carries a non-empty [learnKey] so
+            // shorthand picks contribute the real reading (e.g. "viet nam" -> 越南) to
+            // the user dictionary rather than the raw cluster.
             if (kSh >= segs.size) {
                 val full = lockedPrefix + text
+                val consumedRaw = composing
+                lockedHistory.addLast(
+                    LockedStep(
+                        rawConsumed = consumedRaw,
+                        nomText = text,
+                        isShorthand = true,
+                        learnKey = learnKey,
+                    )
+                )
+                learnUserPhrases(lockedHistory.toList())
                 currentInputConnection?.commitText(full, 1)
                 observeNgramForCommit(full)
                 bumpRecent(text)
@@ -532,6 +595,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                 lockedHistory.clear()
                 currentCandidates = emptyList()
                 currentCandidateConsumed = IntArray(0)
+                currentShorthandOrigKeys = emptyArray()
                 shorthandActive = false
                 shorthandSegments = emptyList()
                 updateComposing()
@@ -548,7 +612,12 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             val consumedRaw = composing.substring(0, firstKChars.coerceAtMost(composing.length))
             val remainingRaw = if (firstKChars >= composing.length) "" else composing.substring(firstKChars)
             lockedHistory.addLast(
-                LockedStep(rawConsumed = consumedRaw, nomText = text, isShorthand = true)
+                LockedStep(
+                    rawConsumed = consumedRaw,
+                    nomText = text,
+                    isShorthand = true,
+                    learnKey = learnKey,
+                )
             )
             lockedPrefix += text
             composing = remainingRaw
@@ -572,7 +641,29 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             // mapping so repeated use of a never-before-seen "raw -> Nom" pair gets cached
             // as a user entry.
             val consumedTail = if (syllables.isEmpty()) composing else composing
-            lockedHistory.addLast(LockedStep(rawConsumed = consumedTail, nomText = text))
+            // If this pick is the tail of a shorthand run (the previous step was
+            // shorthand and the current tail is a single unspaced syllable / letter),
+            // recover the full ascii reading of [text] from the reverse single-char
+            // index so [learnUserPhrases] can register the combined phrase using real
+            // Vietnamese readings rather than the raw letter fragment in [consumedTail]
+            // (e.g. "t" -> 心 becomes "tam" -> 心 so the full shorthand run "qt"
+            // learns "quan tam" -> 關心 instead of the useless "t" -> 心).
+            val tailLearnKey = if (
+                lockedHistory.isNotEmpty() && lockedHistory.last().isShorthand &&
+                !consumedTail.contains(' ') && text.length == 1
+            ) NomDictionary.lookupAsciiReadingForNom(
+                text,
+                consumedTail,
+                lockedHistory.last().learnKey,
+            ) else ""
+            lockedHistory.addLast(
+                LockedStep(
+                    rawConsumed = consumedTail,
+                    nomText = text,
+                    isShorthand = tailLearnKey.isNotEmpty(),
+                    learnKey = tailLearnKey,
+                )
+            )
             learnUserPhrases(lockedHistory.toList())
             currentInputConnection?.commitText(full, 1)
             observeNgramForCommit(full)
@@ -592,7 +683,25 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // when the user finishes) and keep the rest live for further selection.
         val consumedRaw = syllables.subList(0, k).joinToString(" ")
         val remaining = syllables.subList(k, syllables.size).joinToString(" ")
-        lockedHistory.addLast(LockedStep(rawConsumed = consumedRaw, nomText = text))
+        // Same shorthand-tail recovery as the final-pick branch above: if the previous
+        // step was shorthand and this pick is a single-char single-syllable pick, tag
+        // the step with its full ascii reading so the learner sees the real reading.
+        val partialLearnKey = if (
+            lockedHistory.isNotEmpty() && lockedHistory.last().isShorthand &&
+            !consumedRaw.contains(' ') && text.length == 1
+        ) NomDictionary.lookupAsciiReadingForNom(
+            text,
+            consumedRaw,
+            lockedHistory.last().learnKey,
+        ) else ""
+        lockedHistory.addLast(
+            LockedStep(
+                rawConsumed = consumedRaw,
+                nomText = text,
+                isShorthand = partialLearnKey.isNotEmpty(),
+                learnKey = partialLearnKey,
+            )
+        )
         lockedPrefix += text
         composing = remaining
         bumpRecent(text)
@@ -702,13 +811,15 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         //                                                        single-syllable input.
         val segmentMode = prefs.getString("pref_space_behavior", "segment") == "segment"
         if (shorthandActive) {
-            val (texts, consumed) = gatherShorthandCandidates(segments!!)
-            currentCandidates = texts
-            currentCandidateConsumed = consumed
+            val triple = gatherShorthandCandidates(segments!!)
+            currentCandidates = triple.first
+            currentCandidateConsumed = triple.second
+            currentShorthandOrigKeys = triple.third
         } else if (segmentMode && composing.isNotEmpty() && composing.contains(' ')) {
             val (texts, consumed) = gatherSegmentCandidates(composing)
             currentCandidates = texts
             currentCandidateConsumed = consumed
+            currentShorthandOrigKeys = emptyArray()
         } else {
             val singleOnly = prefs.getBoolean("pref_single_syl_single_char_only", false)
             val isSingleSyllable = !composing.contains(' ')
@@ -736,6 +847,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             )
             currentCandidates = ordered
             currentCandidateConsumed = IntArray(ordered.size) { syllableCount(composing) }
+            currentShorthandOrigKeys = emptyArray()
         }
         candidateBar.setCandidates(currentCandidates)
         candidateBar.visibility = if (showCandidate) View.VISIBLE else View.GONE
@@ -833,37 +945,58 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
      * pick the longest-matching interpretation in one tap. Sorting is the same as
      * segment mode: (consumed desc, recency desc, n-gram score desc).
      */
-    private fun gatherShorthandCandidates(segments: List<String>): Pair<List<String>, IntArray> {
-        if (segments.size < 2) return Pair(emptyList(), IntArray(0))
-        val consumedFor = LinkedHashMap<String, Int>()
+    private fun gatherShorthandCandidates(
+        segments: List<String>
+    ): Triple<List<String>, IntArray, Array<String>> {
+        if (segments.size < 2) return Triple(emptyList(), IntArray(0), emptyArray())
+        // Per-text: best-so-far (consumed, origKey). We keep the origKey of whichever
+        // entry produced the current best consumed value so the pick handler can learn
+        // the mapping under that reading.
+        data class Hit(var consumed: Int, var origKey: String)
+        val hits = LinkedHashMap<String, Hit>()
         for (k in segments.size downTo 2) {
             val prefix = segments.subList(0, k)
-            for ((_, values) in NomDictionary.lookupWordByVietTat(prefix)) {
+            for ((origKey, values) in NomDictionary.lookupWordByVietTat(prefix)) {
                 for (v in values) {
-                    val prev = consumedFor[v]
-                    if (prev == null || prev < k) consumedFor[v] = k
+                    val prev = hits[v]
+                    if (prev == null) {
+                        hits[v] = Hit(k, origKey)
+                    } else if (prev.consumed < k) {
+                        prev.consumed = k
+                        prev.origKey = origKey
+                    }
                 }
             }
         }
         // First-segment singles: every Nom character whose ascii syllable starts with
         // segments[0]. Tagged with consumed=1 so picking one keeps the remainder live
         // as a smaller viet-tat cluster (or a single leftover segment if only one
-        // segment remains afterwards).
+        // segment remains afterwards). The origKey is filled with the full ascii
+        // reading of the Nom character that starts with segments[0] (looked up in
+        // the reverse single-char index), so that when the user finishes the
+        // whole shorthand run the learned user-dict entry uses the real compound
+        // reading (e.g. picking 關 then 心 for "qt" learns "quan tam" -> 關心 rather
+        // than the useless "t" -> 心 fallback that a missing origKey would produce.
         for (hit in NomDictionary.lookupSinglePrefix(segments[0])) {
-            if (!consumedFor.containsKey(hit)) consumedFor[hit] = 1
+            if (!hits.containsKey(hit)) {
+                val reading = NomDictionary.lookupAsciiReadingForNom(hit, segments[0])
+                hits[hit] = Hit(1, reading)
+            }
         }
-        val entries = consumedFor.entries.toList().sortedWith(
-            compareByDescending<Map.Entry<String, Int>> { it.value }
+        val entries = hits.entries.toList().sortedWith(
+            compareByDescending<Map.Entry<String, Hit>> { it.value.consumed }
                 .thenByDescending { recentCounts.getOrDefault(it.key, 0) }
                 .thenByDescending { NgramModel.score(it.key) }
         )
         val texts = ArrayList<String>(entries.size)
         val consumed = IntArray(entries.size)
+        val origKeys = Array(entries.size) { "" }
         for ((idx, e) in entries.withIndex()) {
             texts.add(e.key)
-            consumed[idx] = e.value
+            consumed[idx] = e.value.consumed
+            origKeys[idx] = e.value.origKey
         }
-        return Pair(texts, consumed)
+        return Triple(texts, consumed, origKeys)
     }
 
     /**
@@ -884,7 +1017,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
      *   5. De-duplicate: if the same Nom text appears at multiple k values, keep the
      *      LARGEST consumed so the user can pick the longest-matching interpretation.
      *   6. Sort by (consumed desc, recency desc, n-gram score desc). Longer matches first
- *      prefers matching the longest available phrase first.
+     *      prefers matching the longest available phrase first.
      */
     private fun gatherSegmentCandidates(raw: String): Pair<List<String>, IntArray> {
         val syllables = splitSyllables(raw)
@@ -984,10 +1117,17 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
      */
     private fun learnUserPhrases(steps: List<LockedStep>) {
         if (steps.isEmpty()) return
-        // Drop any step that was produced by shorthand-mode picking – those have no
-        // real Vietnamese reading we can key on. If the whole composition was
-        // shorthand, there is nothing to learn here.
-        val cleanSteps = steps.filter { !it.isShorthand && it.rawConsumed.isNotEmpty() }
+        // Drop steps that have no usable reading: a shorthand step is usable only when
+        // it carries a non-empty [learnKey] (set by the pick handler when the
+        // candidate came from a bundled-dictionary compound, e.g. "vn" -> "việt nam");
+        // a non-shorthand step is usable whenever [rawConsumed] is non-empty. This lets
+        // shorthand compound picks contribute the REAL Vietnamese reading to the user
+        // dictionary (so "viet nam" later hits 越南), while still skipping the useless
+        // single-char shorthand picks that have no reading.
+        val cleanSteps = steps.filter {
+            val reading = if (it.learnKey.isNotEmpty()) it.learnKey else it.rawConsumed
+            reading.isNotEmpty() && !(it.isShorthand && it.learnKey.isEmpty())
+        }
         if (cleanSteps.isEmpty()) return
         val ctx = applicationContext
         // Make sure the user dictionary is loaded before we attempt to read it for merging.
@@ -999,8 +1139,11 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // them again.
         data class Sub(val key: String, val nom: String)
         val subs = ArrayList<Sub>()
+        // Per-step reading: learnKey wins when set (shorthand), otherwise rawConsumed.
+        fun readingOf(step: LockedStep): String =
+            if (step.learnKey.isNotEmpty()) step.learnKey else step.rawConsumed
         // Always include the full phrase first.
-        val fullKey = cleanSteps.joinToString(" ") { it.rawConsumed.trim() }
+        val fullKey = cleanSteps.joinToString(" ") { readingOf(it).trim() }
             .replace(Regex("\\s+"), " ").trim().lowercase()
         val fullNom = cleanSteps.joinToString("") { it.nomText }
         if (fullKey.isNotEmpty() && fullNom.isNotEmpty()) subs.add(Sub(fullKey, fullNom))
@@ -1012,7 +1155,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                 // Skip the [0, steps.size) range – already added above as full phrase.
                 if (start == 0 && len == cleanSteps.size) continue
                 val segment = cleanSteps.subList(start, start + len)
-                val key = segment.joinToString(" ") { it.rawConsumed.trim() }
+                val key = segment.joinToString(" ") { readingOf(it).trim() }
                     .replace(Regex("\\s+"), " ").trim().lowercase()
                 val nom = segment.joinToString("") { it.nomText }
                 if (key.isEmpty() || nom.isEmpty()) continue
@@ -1064,6 +1207,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         lockedHistory.clear()
         currentCandidates = emptyList()
         currentCandidateConsumed = IntArray(0)
+        currentShorthandOrigKeys = emptyArray()
         shorthandActive = false
         shorthandSegments = emptyList()
         candidateBar.clear()
@@ -1078,6 +1222,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         lockedHistory.clear()
         currentCandidates = emptyList()
         currentCandidateConsumed = IntArray(0)
+        currentShorthandOrigKeys = emptyArray()
         shorthandActive = false
         shorthandSegments = emptyList()
         if (::candidateBar.isInitialized) candidateBar.clear()
