@@ -9,6 +9,8 @@
     <string name="section_setup">Getting started</string>
     <string name="section_try">Try the keyboard</string>
     <string name="section_prefs">Preferences</string>
+    <string name="section_prefs_summary">Tone style, space behaviour, suggestions, font, text size, history…</string>
+    <string name="section_prefs_open">Open Preferences</string>
     <string name="section_data">Data &amp; dictionary</string>
 
     <string name="settings_title">Settings</string>

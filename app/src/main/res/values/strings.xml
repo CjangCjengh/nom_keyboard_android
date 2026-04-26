@@ -9,6 +9,8 @@
     <string name="section_setup">Khởi động</string>
     <string name="section_try">Thử bàn phím</string>
     <string name="section_prefs">Tuỳ chọn</string>
+    <string name="section_prefs_summary">Kiểu dấu, phím cách, gợi ý, phông chữ, cỡ chữ, lịch sử…</string>
+    <string name="section_prefs_open">Mở Tuỳ chọn</string>
     <string name="section_data">Dữ liệu &amp; từ điển</string>
 
     <string name="settings_title">Cài đặt</string>

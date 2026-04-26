@@ -179,34 +179,57 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ==== Card 3: 偏好设置（托管 PreferenceFragment） ==== -->
+            <!-- ==== Card 3: 偏好设置（单行入口，点开进独立页面） ==== -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.App.Card"
+                android:id="@+id/btn_open_prefs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/app_card_gap"
-                app:contentPadding="0dp">
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:src="@drawable/ic_tune"
+                        android:layout_marginEnd="14dp"
+                        android:contentDescription="@string/section_prefs"
+                        android:tint="?attr/colorPrimary" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/section_prefs"
-                        android:textAppearance="@style/TextAppearance.App.SectionTitle"
-                        android:paddingStart="16dp"
-                        android:paddingEnd="16dp"
-                        android:paddingTop="16dp"
-                        android:paddingBottom="4dp" />
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                    <!-- 偏好容器：PreferenceFragmentCompat 会被挂到这里 -->
-                    <FrameLayout
-                        android:id="@+id/settings_container"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/section_prefs"
+                            android:textAppearance="@style/TextAppearance.App.SectionTitle" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/section_prefs_summary"
+                            android:textAppearance="@style/TextAppearance.App.Body"
+                            android:paddingTop="2dp" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:src="@drawable/ic_chevron_right"
+                        android:layout_marginStart="10dp"
+                        android:contentDescription="@string/section_prefs_open" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

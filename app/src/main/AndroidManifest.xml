@@ -28,6 +28,13 @@
             android:label="@string/user_dict_title"
             android:theme="@style/Theme.NomKeyboard" />
 
+        <!-- Tuỳ chọn (全屏偏好设置页) -->
+        <activity
+            android:name=".ui.PreferencesActivity"
+            android:exported="false"
+            android:label="@string/section_prefs"
+            android:theme="@style/Theme.NomKeyboard" />
+
         <!-- 输入法服务 -->
         <service
             android:name=".NomInputMethodService"

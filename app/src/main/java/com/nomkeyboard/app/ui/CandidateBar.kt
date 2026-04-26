@@ -87,7 +87,16 @@ class CandidateBar @JvmOverloads constructor(
     }
 
     fun setTypeface(tf: Typeface?) {
-        textPaint.typeface = tf ?: Typeface.DEFAULT
+        val face = tf ?: Typeface.DEFAULT
+        // Both paints get the same typeface. `textPaint` draws the Nom candidates on the
+        // right; `labelPaint` draws the "current composing" strip on the left. The
+        // composing text is normally pure quốc ngữ so the Nom font makes no visual
+        // difference there – BUT some flows (e.g. committing a candidate and continuing
+        // to type, or the raw-commit escape path) can leave Nom glyphs mixed in with the
+        // Vietnamese letters. Falling back to Typeface.DEFAULT for the label would then
+        // render those Nom codepoints as tofu boxes, so we keep the two paints in sync.
+        textPaint.typeface = face
+        labelPaint.typeface = face
         invalidate()
     }
 
