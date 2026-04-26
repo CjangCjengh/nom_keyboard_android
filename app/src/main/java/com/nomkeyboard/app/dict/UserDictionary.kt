@@ -121,7 +121,14 @@ object UserDictionary {
             val result = LinkedHashSet<String>()
             for ((asciiKey, originals) in asciiIndex) {
                 if (result.size >= limit) break
-                if (asciiKey.length > qAscii.length && asciiKey.startsWith(qAscii)) {
+                // Compare on a space-stripped form because user-dict keys typically carry
+                // real spaces (e.g. "bình kiêu") while queries are tested both with and
+                // without spaces (e.g. the user typing "bình k" has qAscii = "binhk").
+                // Leaving spaces in asciiKey would cause "binh kieu".startsWith("binhk")
+                // to fail and the user's learned phrase would never re-surface on a
+                // prefix query.
+                val keyCompact = asciiKey.replace(" ", "")
+                if (keyCompact.length > qAscii.length && keyCompact.startsWith(qAscii)) {
                     for (orig in originals) {
                         entries[orig]?.let { values ->
                             for (v in values) {

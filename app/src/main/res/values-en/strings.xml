@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Nom Keyboard</string>
     <string name="ime_name">Nom Keyboard</string>
-    <string name="subtype_vi">Vietnamese (Chữ Nôm)</string>
+    <string name="subtype_vi">Vietnamese (Hán Nôm)</string>
 
     <string name="settings_title">Settings</string>
     <string name="enable_ime_title">1. Enable keyboard</string>
@@ -15,6 +15,23 @@
     <string name="pref_dark_theme_summary">Use a dark background for the keyboard</string>
     <string name="pref_tone_style">Tone mark placement</string>
     <string name="pref_tone_style_summary">Choose traditional (hóa, thúy) or modern (hoá, thuý) placement on open diphthongs such as oa, oe, uy</string>
+    <string name="pref_space_behavior">Space bar behaviour</string>
+    <string name="pref_space_behavior_summary">How the space key handles the current composing text: segment-by-segment, commit-when-no-candidate, or always commit directly</string>
+    <string name="pref_ngram_n">N-gram learning length</string>
+    <string name="pref_ngram_n_summary">How many consecutive Nom characters the keyboard learns to give smarter context-aware suggestions</string>
+    <string name="pref_ngram_export">Export n-gram frequencies</string>
+    <string name="pref_ngram_export_summary">Save everything the keyboard has learned (frequencies of Nom character sequences) to a TSV file for backup or transfer to another device</string>
+    <string name="pref_ngram_import">Import n-gram frequencies</string>
+    <string name="pref_ngram_import_summary">Load n-gram frequencies from a previously exported TSV file; can be merged with current data or fully replace it</string>
+    <string name="ngram_export_default_name">ngram.tsv</string>
+    <string name="ngram_import_title">Import n-gram frequencies</string>
+    <string name="ngram_import_message">Merge the new frequencies with the current data (counts are summed), or replace all current data?</string>
+    <string name="ngram_import_merge">Merge</string>
+    <string name="ngram_import_replace">Replace</string>
+    <string name="ngram_imported_fmt">Import complete. Total n-grams: %1$d</string>
+    <string name="ngram_import_failed_fmt">Import failed: %1$s</string>
+    <string name="ngram_exported_fmt">Exported %1$d n-grams</string>
+    <string name="ngram_export_failed_fmt">Export failed: %1$s</string>
     <string name="pref_vibrate">Key vibration</string>
     <string name="pref_vibrate_summary">Light haptic feedback when pressing keys</string>
     <string name="pref_sound">Key sound</string>

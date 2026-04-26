@@ -1,34 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Bàn phím chữ Nôm</string>
-    <string name="ime_name">Bàn phím Nôm</string>
-    <string name="subtype_vi">Tiếng Việt (chữ Nôm)</string>
+    <string name="app_name">Bàn phím Hán Nôm</string>
+    <string name="ime_name">Bàn phím Hán Nôm</string>
+    <string name="subtype_vi">Tiếng Việt (Hán Nôm)</string>
 
     <string name="settings_title">Cài đặt</string>
     <string name="enable_ime_title">1. Bật bàn phím</string>
-    <string name="enable_ime_summary">Mở Cài đặt hệ thống · Ngôn ngữ và bàn phím · Quản lý bàn phím, rồi bật Bàn phím Nôm</string>
+    <string name="enable_ime_summary">Mở Cài đặt hệ thống · Ngôn ngữ và bàn phím · Quản lý bàn phím, rồi bật Bàn phím Hán Nôm</string>
     <string name="choose_ime_title">2. Chọn bàn phím</string>
-    <string name="choose_ime_summary">Nhấn vào đây để hiện trình chọn bàn phím và chuyển sang Bàn phím Nôm</string>
+    <string name="choose_ime_summary">Nhấn vào đây để hiện trình chọn bàn phím và chuyển sang Bàn phím Hán Nôm</string>
     <string name="test_input_hint">Gõ thử ở đây…</string>
 
     <string name="pref_dark_theme">Giao diện tối</string>
     <string name="pref_dark_theme_summary">Sử dụng nền tối cho bàn phím</string>
     <string name="pref_tone_style">Vị trí dấu thanh</string>
     <string name="pref_tone_style_summary">Chọn kiểu cũ (hóa, thúy) hay kiểu mới (hoá, thuý) khi gõ các vần mở như oa, oe, uy</string>
+    <string name="pref_space_behavior">Cách xử lý phím cách</string>
+    <string name="pref_space_behavior_summary">Chọn cách phím cách xử lý văn bản đang gõ: chuyển đổi từng đoạn, hay xác nhận luôn khi không có gợi ý, hay luôn xác nhận trực tiếp</string>
+    <string name="pref_ngram_n">Độ dài n-gram ghi nhớ</string>
+    <string name="pref_ngram_n_summary">Số chữ Hán Nôm liên tiếp mà bàn phím sẽ học để gợi ý thông minh hơn theo ngữ cảnh</string>
+    <string name="pref_ngram_export">Xuất tần suất n-gram</string>
+    <string name="pref_ngram_export_summary">Lưu toàn bộ dữ liệu học được (tần suất các chuỗi chữ Hán Nôm đã gõ) ra tệp TSV để sao lưu hoặc chuyển sang thiết bị khác</string>
+    <string name="pref_ngram_import">Nhập tần suất n-gram</string>
+    <string name="pref_ngram_import_summary">Nạp tần suất n-gram từ tệp TSV đã xuất trước đó; có thể gộp vào dữ liệu hiện tại hoặc thay thế toàn bộ</string>
+    <string name="ngram_export_default_name">ngram.tsv</string>
+    <string name="ngram_import_title">Nhập tần suất n-gram</string>
+    <string name="ngram_import_message">Gộp tần suất mới vào dữ liệu hiện có (cộng dồn số lần), hay thay thế toàn bộ dữ liệu hiện có?</string>
+    <string name="ngram_import_merge">Gộp</string>
+    <string name="ngram_import_replace">Thay thế</string>
+    <string name="ngram_imported_fmt">Đã nhập xong. Tổng số n-gram: %1$d</string>
+    <string name="ngram_import_failed_fmt">Nhập thất bại: %1$s</string>
+    <string name="ngram_exported_fmt">Đã xuất %1$d n-gram</string>
+    <string name="ngram_export_failed_fmt">Xuất thất bại: %1$s</string>
     <string name="pref_vibrate">Rung khi gõ phím</string>
     <string name="pref_vibrate_summary">Phản hồi rung nhẹ mỗi khi nhấn phím</string>
     <string name="pref_sound">Âm thanh phím</string>
     <string name="pref_sound_summary">Phát tiếng nhấp khi gõ phím</string>
-    <string name="pref_show_candidates">Hiển thị thanh gợi ý chữ Nôm</string>
-    <string name="pref_show_candidates_summary">Hiện các chữ Nôm đề xuất phía trên bàn phím, chạm để chọn</string>
+    <string name="pref_show_candidates">Hiển thị thanh gợi ý Hán Nôm</string>
+    <string name="pref_show_candidates_summary">Hiện các chữ Hán Nôm đề xuất phía trên bàn phím, chạm để chọn</string>
     <string name="pref_candidate_text_size">Cỡ chữ bàn phím</string>
     <string name="pref_candidate_text_size_summary">Điều chỉnh cỡ chữ trên các phím và trên thanh gợi ý</string>
     <string name="pref_auto_caps">Tự động viết hoa đầu câu</string>
     <string name="pref_auto_caps_summary">Tự bật Shift khi con trỏ ở đầu câu hoặc sau dấu chấm</string>
-    <string name="pref_use_nom_font">Dùng phông chữ Nôm có sẵn</string>
-    <string name="pref_use_nom_font_summary">Hiển thị chữ Nôm trên thanh gợi ý và khung gõ thử bằng phông Han-Nom Gothic đi kèm ứng dụng. Tắt để dùng phông hệ thống.</string>
+    <string name="pref_use_nom_font">Dùng phông chữ Hán Nôm có sẵn</string>
+    <string name="pref_use_nom_font_summary">Hiển thị chữ Hán Nôm trên thanh gợi ý và khung gõ thử bằng phông Han-Nom Gothic đi kèm ứng dụng. Tắt để dùng phông hệ thống.</string>
     <string name="pref_clear_history">Xoá lịch sử học</string>
-    <string name="pref_clear_history_summary">Quên tần suất các chữ Nôm đã dùng gần đây</string>
+    <string name="pref_clear_history_summary">Quên tần suất các chữ Hán Nôm đã dùng gần đây</string>
     <string name="cleared">Đã xoá</string>
 
     <!-- Từ điển người dùng -->
@@ -45,9 +62,9 @@
     <string name="user_dict_save">Lưu</string>
     <string name="user_dict_cancel">Huỷ</string>
     <string name="user_dict_hint_key">Âm đọc (ví dụ: việt nam)</string>
-    <string name="user_dict_hint_values">Các chữ Nôm ứng viên, ngăn cách bằng dấu cách</string>
+    <string name="user_dict_hint_values">Các chữ Hán Nôm ứng viên, ngăn cách bằng dấu cách</string>
     <string name="user_dict_err_empty_key">Vui lòng nhập âm đọc</string>
-    <string name="user_dict_err_empty_values">Vui lòng nhập ít nhất một chữ Nôm</string>
+    <string name="user_dict_err_empty_values">Vui lòng nhập ít nhất một chữ Hán Nôm</string>
     <string name="user_dict_import_title">Nhập từ điển</string>
     <string name="user_dict_import_message">Gộp các mục mới vào từ điển hiện tại, hay thay thế toàn bộ?</string>
     <string name="user_dict_import_merge">Gộp</string>

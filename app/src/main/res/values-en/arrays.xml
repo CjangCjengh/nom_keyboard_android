@@ -18,4 +18,30 @@
         <item>old</item>
         <item>new</item>
     </string-array>
+    <string-array name="space_behavior_entries">
+        <item>Segment-by-segment</item>
+        <item>Commit when no candidate</item>
+        <item>Always commit directly</item>
+    </string-array>
+    <string-array name="space_behavior_values">
+        <item>segment</item>
+        <item>commit_on_empty</item>
+        <item>commit_direct</item>
+    </string-array>
+    <string-array name="ngram_n_entries">
+        <item>1 (single-char frequency only)</item>
+        <item>2</item>
+        <item>3 (default)</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
+    <string-array name="ngram_n_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
 </resources>

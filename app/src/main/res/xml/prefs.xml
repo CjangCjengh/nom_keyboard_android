@@ -17,6 +17,32 @@
         android:entryValues="@array/tone_style_values"
         android:defaultValue="new" />
 
+    <ListPreference
+        android:key="pref_space_behavior"
+        android:title="@string/pref_space_behavior"
+        android:summary="@string/pref_space_behavior_summary"
+        android:entries="@array/space_behavior_entries"
+        android:entryValues="@array/space_behavior_values"
+        android:defaultValue="segment" />
+
+    <ListPreference
+        android:key="pref_ngram_n"
+        android:title="@string/pref_ngram_n"
+        android:summary="@string/pref_ngram_n_summary"
+        android:entries="@array/ngram_n_entries"
+        android:entryValues="@array/ngram_n_values"
+        android:defaultValue="3" />
+
+    <Preference
+        android:key="pref_ngram_export"
+        android:title="@string/pref_ngram_export"
+        android:summary="@string/pref_ngram_export_summary" />
+
+    <Preference
+        android:key="pref_ngram_import"
+        android:title="@string/pref_ngram_import"
+        android:summary="@string/pref_ngram_import_summary" />
+
     <SwitchPreferenceCompat
         android:key="pref_show_candidates"
         android:title="@string/pref_show_candidates"

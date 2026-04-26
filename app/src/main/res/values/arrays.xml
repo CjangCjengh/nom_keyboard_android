@@ -18,4 +18,30 @@
         <item>old</item>
         <item>new</item>
     </string-array>
+    <string-array name="space_behavior_entries">
+        <item>Chuyển đổi theo từng đoạn</item>
+        <item>Xác nhận khi không có gợi ý</item>
+        <item>Luôn xác nhận trực tiếp</item>
+    </string-array>
+    <string-array name="space_behavior_values">
+        <item>segment</item>
+        <item>commit_on_empty</item>
+        <item>commit_direct</item>
+    </string-array>
+    <string-array name="ngram_n_entries">
+        <item>1 (chỉ tần suất chữ đơn)</item>
+        <item>2</item>
+        <item>3 (mặc định)</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
+    <string-array name="ngram_n_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
 </resources>
