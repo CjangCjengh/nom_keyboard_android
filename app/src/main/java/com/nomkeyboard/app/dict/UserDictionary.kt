@@ -84,12 +84,22 @@ object UserDictionary {
         synchronized(this) { return entries.size }
     }
 
-    fun lookupSingle(query: String): List<String> {
+    fun lookupSingle(query: String, strict: Boolean = false): List<String> {
         if (query.isEmpty()) return emptyList()
         synchronized(this) {
             val q = query.lowercase()
             val result = LinkedHashSet<String>()
             entries[q]?.let { if (!q.contains(' ')) result.addAll(it) }
+            if (strict) {
+                // Strict: no ascii-index fallback so `tâm` can't pick up a stray
+                // `tam: 三` user-dict entry. Still tolerate old/new tone-style
+                // spellings so `hóa ↔ hoá` stays interchangeable.
+                val qNorm = ToneStyle.normaliseToNewStyle(q)
+                if (qNorm != q) {
+                    entries[qNorm]?.let { if (!qNorm.contains(' ')) result.addAll(it) }
+                }
+                return result.toList()
+            }
             val qAscii = NomDictionary.stripDiacritics(q)
             asciiIndex[qAscii]?.forEach { k ->
                 if (!k.contains(' ')) entries[k]?.let { result.addAll(it) }
@@ -98,13 +108,24 @@ object UserDictionary {
         }
     }
 
-    fun lookupWord(query: String): List<String> {
+    fun lookupWord(query: String, strict: Boolean = false): List<String> {
         if (query.isEmpty()) return emptyList()
         synchronized(this) {
             val q = query.lowercase()
             val result = LinkedHashSet<String>()
             entries[q]?.let { result.addAll(it) }
             entries[q.replace(" ", "")]?.let { result.addAll(it) }
+            if (strict) {
+                // Strict: no ascii-index fallback – user-dict lookups must match the
+                // exact stored (toned) key. Old/new tone-style normalisation still
+                // applies so the user can type either variant.
+                val qNorm = ToneStyle.normaliseToNewStyle(q)
+                if (qNorm != q) {
+                    entries[qNorm]?.let { result.addAll(it) }
+                    entries[qNorm.replace(" ", "")]?.let { result.addAll(it) }
+                }
+                return result.toList()
+            }
             val qAscii = NomDictionary.stripDiacritics(q)
             asciiIndex[qAscii]?.forEach { k -> entries[k]?.let { result.addAll(it) } }
             val qAsciiNoSp = qAscii.replace(" ", "")
@@ -113,12 +134,71 @@ object UserDictionary {
         }
     }
 
-    fun lookupPrefix(query: String, limit: Int = 16): List<String> {
+    /**
+     * Shorthand ("viết tắt") lookup over user entries: match [segments] against
+     * the ascii syllables of each stored key, where segment i must be a prefix of
+     * syllable i. Example: segments = ["ng", "k"] matches a user-learned entry
+     * keyed on "ngạo kiêu" (ascii syllables ["ngao", "kieu"]) because
+     * "ngao".startsWith("ng") and "kieu".startsWith("k"). Returns
+     * `(originalKey, values)` pairs in insertion order.
+     *
+     * This exists so phrases the user has taught the IME via segment mode (e.g.
+     * 傲嬌, 病嬌) keep resurfacing when the user types them in compact shorthand
+     * form the next time around, the same way bundled-dictionary words do.
+     */
+    fun lookupWordByVietTat(
+        segments: List<String>,
+        limit: Int = 24
+    ): List<Pair<String, List<String>>> {
+        if (segments.size < 2) return emptyList()
+        if (segments.any { it.isEmpty() }) return emptyList()
+        val n = segments.size
+        synchronized(this) {
+            val result = ArrayList<Pair<String, List<String>>>()
+            for ((key, values) in entries) {
+                if (result.size >= limit) break
+                if (!key.contains(' ')) continue
+                val sylls = key.split(' ').filter { it.isNotEmpty() }
+                if (sylls.size != n) continue
+                var ok = true
+                for (i in 0 until n) {
+                    val ascii = NomDictionary.stripDiacritics(sylls[i])
+                    if (!ascii.startsWith(segments[i])) { ok = false; break }
+                }
+                if (!ok) continue
+                result.add(key to values.toList())
+            }
+            return result
+        }
+    }
+
+    fun lookupPrefix(query: String, limit: Int = 16, strict: Boolean = false): List<String> {
         if (query.isEmpty()) return emptyList()
         synchronized(this) {
+            val result = LinkedHashSet<String>()
+            if (strict) {
+                // Strict: prefix-match against the ORIGINAL (toned) keys, with old/new
+                // tone-style normalisation applied so `hóa ↔ hoá` equivalence still
+                // works. No ascii fallback – we must preserve the tone discipline the
+                // user asked for by turning lenient mode off.
+                val qNorm = ToneStyle.normaliseToNewStyle(query.lowercase()).trim()
+                if (qNorm.isEmpty()) return emptyList()
+                val qNormNoSp = qNorm.replace(" ", "")
+                for ((key, values) in entries) {
+                    if (result.size >= limit) break
+                    val keyNoSp = key.replace(" ", "")
+                    val hits = (key.length > qNorm.length && key.startsWith(qNorm)) ||
+                        (keyNoSp.length > qNormNoSp.length && keyNoSp.startsWith(qNormNoSp))
+                    if (!hits) continue
+                    for (v in values) {
+                        result.add(v)
+                        if (result.size >= limit) break
+                    }
+                }
+                return result.toList()
+            }
             val qAscii = NomDictionary.stripDiacritics(query.lowercase()).replace(" ", "")
             if (qAscii.isEmpty()) return emptyList()
-            val result = LinkedHashSet<String>()
             for ((asciiKey, originals) in asciiIndex) {
                 if (result.size >= limit) break
                 // Compare on a space-stripped form because user-dict keys typically carry
@@ -141,6 +221,43 @@ object UserDictionary {
                 }
             }
             return result.toList()
+        }
+    }
+
+    /**
+     * Same as [lookupPrefix] but returns `(origKey, nomValue)` pairs so callers can
+     * learn the mapping under the user's real (toned) spelling rather than the
+     * truncated letters the user just typed. Used by the segment-mode learner to
+     * recover the full reading for a multi-char Nom pick that originated as a
+     * prefix completion (e.g. user typed "bịnh ki" and picked 病嬌 that came from
+     * a stored `bình kiêu -> 病嬌` entry; the learner can then upgrade learnKey
+     * to the stored `bình kiêu` instead of re-writing the truncated `bịnh ki`).
+     */
+    fun lookupPrefixWithKeys(
+        query: String,
+        limit: Int = 32
+    ): List<Pair<String, String>> {
+        if (query.isEmpty()) return emptyList()
+        synchronized(this) {
+            val qAscii = NomDictionary.stripDiacritics(query.lowercase()).replace(" ", "")
+            if (qAscii.isEmpty()) return emptyList()
+            val result = ArrayList<Pair<String, String>>()
+            for ((asciiKey, originals) in asciiIndex) {
+                if (result.size >= limit) break
+                val keyCompact = asciiKey.replace(" ", "")
+                if (keyCompact.length > qAscii.length && keyCompact.startsWith(qAscii)) {
+                    for (orig in originals) {
+                        entries[orig]?.let { values ->
+                            for (v in values) {
+                                result.add(orig to v)
+                                if (result.size >= limit) break
+                            }
+                        }
+                        if (result.size >= limit) break
+                    }
+                }
+            }
+            return result
         }
     }
 

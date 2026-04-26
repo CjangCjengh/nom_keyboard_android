@@ -116,50 +116,68 @@ object NomDictionary {
      * shorthand learning records "quan tam" -> 關心 instead of "quan tim").
      */
     private fun buildNomReverseIndex() {
-        // Temp: nom -> list of (asciiReading, position, insertionOrder)
-        data class Entry(val ascii: String, val position: Int, val order: Int)
+        // Temp: nom -> list of (originalReading, asciiForm, position, insertionOrder).
+        // We store the reading WITH diacritics (just lowercased + trimmed) so
+        // shorthand single-char picks can learn user-dict entries keyed on the real
+        // Vietnamese spelling (e.g. "bình kiều" -> 病嬌, not "binh kieu"). Dedup is
+        // still done in ascii space so variants that collapse to the same bare form
+        // (`tâm` and `tấm` both -> `tam`) don't bloat the per-character list.
+        data class Entry(val reading: String, val ascii: String, val position: Int, val order: Int)
         val temp = HashMap<String, ArrayList<Entry>>(7000)
         var order = 0
-        for ((reading, noms) in singleMap) {
-            val ascii = stripDiacritics(reading.lowercase()).trim()
+        for ((rawReading, noms) in singleMap) {
+            val reading = rawReading.lowercase().trim()
+            if (reading.isEmpty()) continue
+            val ascii = stripDiacritics(reading)
             if (ascii.isEmpty()) continue
             for ((pos, nom) in noms.withIndex()) {
                 val list = temp.getOrPut(nom) { ArrayList(2) }
-                // Keep only the best (lowest) position per ascii reading to dedup
-                // entries that share the same ascii form (e.g. tâm and tấm both
-                // stripped to `tam`).
                 val existing = list.indexOfFirst { it.ascii == ascii }
                 if (existing >= 0) {
                     val old = list[existing]
-                    if (pos < old.position) list[existing] = Entry(ascii, pos, old.order)
+                    // Keep the ascii-level winner by dictionary position, but upgrade
+                    // the stored reading if the new one happens to be at a better slot.
+                    if (pos < old.position) {
+                        list[existing] = Entry(reading, ascii, pos, old.order)
+                    }
                 } else {
-                    list.add(Entry(ascii, pos, order++))
+                    list.add(Entry(reading, ascii, pos, order++))
                 }
             }
         }
         for ((nom, entries) in temp) {
             entries.sortWith(compareBy({ it.position }, { it.order }))
             val out = ArrayList<String>(entries.size)
-            for (e in entries) out.add(e.ascii)
+            for (e in entries) out.add(e.reading)
             nomToSingleAsciiReadings[nom] = out
         }
     }
 
     /**
-     * Pick an ascii reading (lowercase, diacritic-free, single-syllable) for the given
-     * single-character Nom [nom]. When [preferPrefix] is non-empty, readings that
-     * start with it are preferred – this lets shorthand single-char picks recover the
+     * Pick a tone-preserving reading (lowercase, single-syllable, e.g. "bình",
+     * "ngạo", "tâm") for the given single-character Nom [nom]. Despite the
+     * legacy `AsciiReading` name, the returned reading keeps its diacritics so
+     * shorthand single-char picks can contribute real Vietnamese spellings to the
+     * user dictionary (typing `bkieu` and picking 病嬌 learns "bình kiều" rather
+     * than the tone-stripped "binh kieu"). Prefix and compound disambiguation
+     * below still works in ascii space – matching is always done on
+     * `stripDiacritics(reading)` – so callers passing ascii `preferPrefix` /
+     * `compoundPrefixReading` continue to behave as before.
+     *
+     * When [preferPrefix] is non-empty, readings whose ascii form starts with it
+     * are preferred – this lets shorthand single-char picks recover the
      * full reading that matches the letter segment the user originally typed (e.g.
      * typing `q` then picking 關 returns "quan" because 關 has readings "quan" ranked
      * first in the bundled dictionary).
      *
      * [compoundPrefixReading] is an additional disambiguator: when set, we look up
-     * `"<compoundPrefixReading> <candidate_reading>"` in the compound dictionary and
-     * prefer readings that produce a known compound. This is how shorthand tails
-     * recover the CORRECT single-char reading when the char has multiple readings
-     * (e.g. 心 has readings `tim` and `tâm`; after picking 關 for "q" we want `tâm`
-     * because 關心 = "quan tâm" is a known compound, not `tim`). If no compound
-     * match is found we fall back to the prefix-based ordering.
+     * `"<compoundPrefixReading> <candidate_reading_in_ascii>"` in the compound
+     * dictionary's ascii index and prefer readings that produce a known compound.
+     * This is how shorthand tails recover the CORRECT single-char reading when the
+     * char has multiple readings (e.g. 心 has readings `tim` and `tâm`; after
+     * picking 關 for "q" we want `tâm` because 關心 = "quan tâm" is a known
+     * compound, not `tim`). If no compound match is found we fall back to the
+     * prefix-based ordering.
      *
      * Returns empty string if no reading is known for [nom] (e.g. multi-char word or
      * a character that only appears in the compound dictionary).
@@ -182,10 +200,11 @@ object NomDictionary {
             val cp = stripDiacritics(compoundPrefixReading.lowercase()).trim()
             if (cp.isNotEmpty()) {
                 for (r in readings) {
-                    if (p.isNotEmpty() && !r.startsWith(p)) continue
-                    val compoundKey = "$cp $r"
-                    val values = wordMap[compoundKey]
-                        ?: asciiWordIndex[compoundKey]?.firstNotNullOfOrNull { wordMap[it] }
+                    val rAscii = stripDiacritics(r)
+                    if (p.isNotEmpty() && !rAscii.startsWith(p)) continue
+                    val compoundKeyAscii = "$cp $rAscii"
+                    val values = asciiWordIndex[compoundKeyAscii]
+                        ?.firstNotNullOfOrNull { wordMap[it] }
                     if (values != null && values.any { it.contains(nom) }) return r
                 }
             }
@@ -193,7 +212,7 @@ object NomDictionary {
         // Second pass: prefix-only preference.
         if (p.isNotEmpty()) {
             for (r in readings) {
-                if (r.startsWith(p)) return r
+                if (stripDiacritics(r).startsWith(p)) return r
             }
         }
         // Fallback: most common reading (dictionary-order first).
@@ -211,6 +230,20 @@ object NomDictionary {
             if (k.startsWith(asciiLower)) return true
         }
         return false
+    }
+
+    /**
+     * @return true iff [asciiLower] is EXACTLY a known ascii single-syllable key (not
+     *   just a prefix of one). Empty input returns false. Used by the pick handler to
+     *   decide whether the raw letters the user consumed for a single-char pick form a
+     *   real Vietnamese syllable that's safe to learn under as-is (e.g. "ban"), or
+     *   whether it's a partial fragment (e.g. "h", "qu") that should be upgraded to
+     *   the Nom character's true reading before learning – or skipped entirely if no
+     *   reading is available.
+     */
+    fun isCompleteAsciiSyllable(asciiLower: String): Boolean {
+        if (asciiLower.isEmpty()) return false
+        return asciiSingleIndex.containsKey(asciiLower)
     }
 
     /**
@@ -353,6 +386,73 @@ object NomDictionary {
         return result
     }
 
+    /**
+     * Reverse lookup used by the learner: given a picked Nom word [nom] and the raw
+     * ascii syllables [segments] the user typed (each a prefix of the real syllable),
+     * find a bundled-dictionary key whose ascii syllables extend each [segments]
+     * entry AND whose value list contains [nom]. Returns the original (diacritic-
+     * preserving) key or null if no such entry exists. Useful to upgrade a
+     * truncated reading like `"bình ki"` back to `"bình kiều"` before recording
+     * the user-dictionary entry.
+     */
+    fun findBundledKeyForNomByVietTat(nom: String, segments: List<String>): String? {
+        if (nom.isEmpty() || segments.isEmpty()) return null
+        if (segments.any { it.isEmpty() }) return null
+        val n = segments.size
+        val firstChar = segments[0][0]
+        val bucket = wordsBySyllableCountAndFirstChar["$n|$firstChar"] ?: return null
+        for (origKey in bucket) {
+            val asciiSylls = wordSyllablesAscii[origKey] ?: continue
+            if (asciiSylls.size != n) continue
+            var ok = true
+            for (i in 0 until n) {
+                if (!asciiSylls[i].startsWith(segments[i])) { ok = false; break }
+            }
+            if (!ok) continue
+            val values = wordMap[origKey] ?: continue
+            if (values.contains(nom)) return origKey
+        }
+        return null
+    }
+
+    /**
+     * @return true iff the bundled word dictionary maps [key] (case-insensitive, with
+     *   or without the exact diacritics) to a value list that already contains [nom].
+     *   Used by the learner to avoid polluting the user dictionary with entries that
+     *   are already covered verbatim by the bundled data.
+     */
+    fun bundledWordContains(key: String, nom: String): Boolean {
+        if (key.isEmpty() || nom.isEmpty()) return false
+        val k = key.trim().lowercase()
+        wordMap[k]?.let { if (it.contains(nom)) return true }
+        wordMap[k.replace(" ", "")]?.let { if (it.contains(nom)) return true }
+        val kAscii = stripDiacritics(k)
+        asciiWordIndex[kAscii]?.forEach { orig ->
+            wordMap[orig]?.let { if (it.contains(nom)) return true }
+        }
+        val kAsciiNoSp = kAscii.replace(" ", "")
+        asciiWordIndex[kAsciiNoSp]?.forEach { orig ->
+            wordMap[orig]?.let { if (it.contains(nom)) return true }
+        }
+        return false
+    }
+
+    /**
+     * @return true iff the bundled single-char dictionary maps [key] (case-insensitive,
+     *   tone-insensitive via the ascii index) to a list that contains [nom]. Used
+     *   together with [bundledWordContains] to suppress no-op learner entries.
+     */
+    fun bundledSingleContains(key: String, nom: String): Boolean {
+        if (key.isEmpty() || nom.isEmpty()) return false
+        val k = key.trim().lowercase()
+        singleMap[k]?.let { if (it.contains(nom)) return true }
+        val kAscii = stripDiacritics(k)
+        asciiSingleIndex[kAscii]?.forEach { orig ->
+            singleMap[orig]?.let { if (it.contains(nom)) return true }
+        }
+        return false
+    }
+
     private fun loadTsv(
         context: Context,
         name: String,
@@ -402,7 +502,10 @@ object NomDictionary {
         val q = query.lowercase()
         val result = LinkedHashSet<String>()
         // User dictionary hits take priority so the user's overrides float to the top.
-        result.addAll(UserDictionary.lookupSingle(q))
+        // Forward [strict] so strict mode doesn't surface user entries keyed on the
+        // ascii form when the user typed the toned form (e.g. `tâm` must NOT pull in
+        // a user-dict `tam: 三` via the ascii-index fallback).
+        result.addAll(UserDictionary.lookupSingle(q, strict))
         singleMap[q]?.let { result.addAll(it) }
         if (strict) {
             // Also try the new-style-normalised form so old-style user input like
@@ -431,7 +534,8 @@ object NomDictionary {
         val q = query.lowercase()
         val result = LinkedHashSet<String>()
         // User dictionary hits are prepended so user overrides win over the bundled data.
-        result.addAll(UserDictionary.lookupWord(q))
+        // Forward [strict] – same rationale as [lookupSingle].
+        result.addAll(UserDictionary.lookupWord(q, strict))
         wordMap[q]?.let { result.addAll(it) }
         wordMap[q.replace(" ", "")]?.let { result.addAll(it) }
         if (strict) {
@@ -467,7 +571,9 @@ object NomDictionary {
         merged.addAll(lookupWord(query, strict))
         merged.addAll(lookupSingle(query, strict))
         // User dictionary prefix matches come first so user-added compound completions win.
-        merged.addAll(UserDictionary.lookupPrefix(query, PREFIX_LIMIT))
+        // Strict mode is propagated so user-learned phrases aren't surfaced via the
+        // ascii prefix fallback when the user explicitly turned lenient match off.
+        merged.addAll(UserDictionary.lookupPrefix(query, PREFIX_LIMIT, strict))
         merged.addAll(lookupPrefix(query, PREFIX_LIMIT, strict))
         // Fold in single-char prefix hits when the query is still a single (possibly
         // partial) syllable – otherwise typing just `q` would surface multi-syllable

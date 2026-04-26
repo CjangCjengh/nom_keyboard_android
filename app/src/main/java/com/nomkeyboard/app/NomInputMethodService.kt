@@ -571,8 +571,22 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             // string when no reading is available (e.g. the candidate came from a
             // single-char prefix hit, not a compound lookup).
             val rawOrigKey = currentShorthandOrigKeys.getOrElse(index) { "" }
-            val learnKey = if (rawOrigKey.isEmpty()) "" else
+            val baseLearnKey = if (rawOrigKey.isEmpty()) "" else
                 rawOrigKey.lowercase().replace(Regex("\\s+"), " ").trim()
+            // Bundled upgrade for multi-segment multi-char picks: the origKey fed in
+            // by [gatherShorthandCandidates] may come from a user-dictionary entry
+            // whose key was itself a truncated shorthand reading (e.g. "bịnh ki"
+            // because that's what the user typed last time). If the bundled
+            // dictionary happens to carry [text] under a key that viết-tắt-matches
+            // the consumed segments, prefer that fully-toned key so future sessions
+            // get the clean spelling (e.g. upgrade "bịnh ki" -> "bình kiều" when
+            // bundled has "bình kiều -> 病嬌"). If not, we keep the user-dict
+            // origKey unchanged so at least recency information is preserved.
+            val shortPrefix = if (kSh >= 2) segs.subList(0, kSh) else emptyList()
+            val shortBundledKey = if (shortPrefix.size >= 2 && text.length > 1)
+                NomDictionary.findBundledKeyForNomByVietTat(text, shortPrefix)
+            else null
+            val learnKey = shortBundledKey ?: baseLearnKey
             // If this pick covers every remaining segment -> FINAL: commit lockedPrefix +
             // text and clear all state. The n-gram model learns the character sequence;
             // [learnUserPhrases] picks up any step that carries a non-empty [learnKey] so
@@ -644,27 +658,83 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             // mapping so repeated use of a never-before-seen "raw -> Nom" pair gets cached
             // as a user entry.
             val consumedTail = if (syllables.isEmpty()) composing else composing
-            // If this pick is the tail of a shorthand run (the previous step was
-            // shorthand and the current tail is a single unspaced syllable / letter),
-            // recover the full ascii reading of [text] from the reverse single-char
-            // index so [learnUserPhrases] can register the combined phrase using real
-            // Vietnamese readings rather than the raw letter fragment in [consumedTail]
-            // (e.g. "t" -> 心 becomes "tam" -> 心 so the full shorthand run "qt"
-            // learns "quan tam" -> 關心 instead of the useless "t" -> 心).
-            val tailLearnKey = if (
-                lockedHistory.isNotEmpty() && lockedHistory.last().isShorthand &&
-                !consumedTail.contains(' ') && text.length == 1
-            ) NomDictionary.lookupAsciiReadingForNom(
-                text,
-                consumedTail,
-                lockedHistory.last().learnKey,
-            ) else ""
+            // Recover the real ascii reading for this pick whenever [consumedTail] is
+            // a single-char pick whose raw letters are NOT a complete Vietnamese
+            // syllable. Two concrete cases are handled here:
+            //
+            //   1. Shorthand tail: the previous step was shorthand (e.g. user typed
+            //      "qt", picked 關 for "q", now picking 心 for "t"). Without recovery
+            //      the learner would store "t: 心" which is useless – instead we look
+            //      up 心's reading that forms a known compound with 關 (= "tâm") and
+            //      learn "quan tâm -> 關心".
+            //
+            //   2. Plain prefix pick: the user typed a single letter that is only a
+            //      PREFIX of some syllable (e.g. "h", "q") and picked a Nom char from
+            //      the prefix candidates. Without recovery the learner would store
+            //      "h: 係" which is equally useless. We recover the full reading so
+            //      it becomes e.g. "hệ: 係". If no reading can be recovered we skip
+            //      learning this step entirely (by marking it as shorthand with an
+            //      empty learnKey, which [learnUserPhrases] drops).
+            //
+            // Complete-syllable picks (e.g. "ban", "quoc") take the no-op branch so
+            // [rawConsumed] is used verbatim as before.
+            val consumedTailAscii = NomDictionary.stripDiacritics(consumedTail.lowercase())
+            val needsTailRecovery = !consumedTail.contains(' ') && text.length == 1 &&
+                !NomDictionary.isCompleteAsciiSyllable(consumedTailAscii)
+            val prevLearnKey = if (lockedHistory.isNotEmpty() &&
+                lockedHistory.last().isShorthand) lockedHistory.last().learnKey else ""
+            val tailLearnKey = if (needsTailRecovery)
+                NomDictionary.lookupAsciiReadingForNom(text, consumedTail, prevLearnKey)
+            else ""
+            // Segment-mode bundled upgrade: when the pick is a multi-character Nom
+            // word AND consumedTail spans ≥ 2 syllables, try to find a bundled key
+            // whose ascii syllables extend those of consumedTail and whose values
+            // include [text]. If found, record the learner under that fully-toned
+            // key (e.g. consumedTail = "quoc gia" + text = 國家 -> learnKey =
+            // "quốc gia"). This keeps user-dictionary entries clean and spelled
+            // with proper diacritics even when the user typed in ascii. Bundled-
+            // covered keys will then be filtered out entirely by the dedup pass
+            // inside [learnUserPhrases], preventing no-op writes.
+            val tailSegments = if (text.length > 1 && consumedTail.contains(' '))
+                consumedTail.split(' ').filter { it.isNotEmpty() }
+                    .map { NomDictionary.stripDiacritics(it.lowercase()) }
+            else emptyList()
+            val tailBundledKey = if (tailSegments.size >= 2)
+                NomDictionary.findBundledKeyForNomByVietTat(text, tailSegments)
+            else null
+            // User-dict fallback: when the picked candidate came from a user-trained
+            // prefix completion (e.g. user typed "bịnh ki", picked 病嬌 that surfaced
+            // because user-dict has "bình kiêu -> 病嬌"), the bundled reverse lookup
+            // returns null but we can still recover the fully-toned reading from the
+            // user dictionary itself. We only accept a match whose origKey's ascii
+            // form has [consumedTail]'s ascii form as a *strict* prefix, so we never
+            // expand the reading to something the user didn't type the start of.
+            val tailUserKey = if (tailBundledKey == null && text.length > 1 &&
+                consumedTail.contains(' ')) {
+                val consumedTailAsciiNoSp = NomDictionary.stripDiacritics(
+                    consumedTail.lowercase()).replace(" ", "")
+                UserDictionary.lookupPrefixWithKeys(consumedTail, 64)
+                    .firstOrNull { (origKey, value) ->
+                        if (value != text) return@firstOrNull false
+                        val origAsciiNoSp = NomDictionary
+                            .stripDiacritics(origKey.lowercase()).replace(" ", "")
+                        origAsciiNoSp.startsWith(consumedTailAsciiNoSp) &&
+                            origAsciiNoSp.length >= consumedTailAsciiNoSp.length
+                    }?.first
+            } else null
+            val effectiveTailLearnKey = tailBundledKey ?: tailUserKey ?: tailLearnKey
+            // Mark as "shorthand" when we performed recovery, whether or not it
+            // succeeded. A successful recovery supplies [learnKey]; a failed recovery
+            // (no reading known for [text]) leaves [learnKey] empty and the shorthand
+            // flag causes [learnUserPhrases] to skip this step rather than pollute the
+            // user dictionary with a bare-letter reading.
             lockedHistory.addLast(
                 LockedStep(
                     rawConsumed = consumedTail,
                     nomText = text,
-                    isShorthand = tailLearnKey.isNotEmpty(),
-                    learnKey = tailLearnKey,
+                    isShorthand = needsTailRecovery || tailBundledKey != null ||
+                        tailUserKey != null,
+                    learnKey = effectiveTailLearnKey,
                 )
             )
             learnUserPhrases(lockedHistory.toList())
@@ -686,23 +756,50 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // when the user finishes) and keep the rest live for further selection.
         val consumedRaw = syllables.subList(0, k).joinToString(" ")
         val remaining = syllables.subList(k, syllables.size).joinToString(" ")
-        // Same shorthand-tail recovery as the final-pick branch above: if the previous
-        // step was shorthand and this pick is a single-char single-syllable pick, tag
-        // the step with its full ascii reading so the learner sees the real reading.
-        val partialLearnKey = if (
-            lockedHistory.isNotEmpty() && lockedHistory.last().isShorthand &&
-            !consumedRaw.contains(' ') && text.length == 1
-        ) NomDictionary.lookupAsciiReadingForNom(
-            text,
-            consumedRaw,
-            lockedHistory.last().learnKey,
-        ) else ""
+        // Same reading-recovery as the final-pick branch above – covers both the
+        // shorthand-tail case and the "single letter is only a syllable prefix" case.
+        // See the detailed comment there for rationale.
+        val consumedRawAscii = NomDictionary.stripDiacritics(consumedRaw.lowercase())
+        val needsPartialRecovery = !consumedRaw.contains(' ') && text.length == 1 &&
+            !NomDictionary.isCompleteAsciiSyllable(consumedRawAscii)
+        val prevPartialLearnKey = if (lockedHistory.isNotEmpty() &&
+            lockedHistory.last().isShorthand) lockedHistory.last().learnKey else ""
+        val partialLearnKey = if (needsPartialRecovery)
+            NomDictionary.lookupAsciiReadingForNom(text, consumedRaw, prevPartialLearnKey)
+        else ""
+        // Segment-mode bundled upgrade (same logic as the final-pick branch, see
+        // there for the full rationale): upgrade learnKey to the bundled key's
+        // fully-toned form whenever we can identify one.
+        val partialSegments = if (text.length > 1 && consumedRaw.contains(' '))
+            consumedRaw.split(' ').filter { it.isNotEmpty() }
+                .map { NomDictionary.stripDiacritics(it.lowercase()) }
+        else emptyList()
+        val partialBundledKey = if (partialSegments.size >= 2)
+            NomDictionary.findBundledKeyForNomByVietTat(text, partialSegments)
+        else null
+        // User-dict fallback mirroring the final-pick branch, see that comment
+        // for the full rationale.
+        val partialUserKey = if (partialBundledKey == null && text.length > 1 &&
+            consumedRaw.contains(' ')) {
+            val consumedRawAsciiNoSp = NomDictionary.stripDiacritics(
+                consumedRaw.lowercase()).replace(" ", "")
+            UserDictionary.lookupPrefixWithKeys(consumedRaw, 64)
+                .firstOrNull { (origKey, value) ->
+                    if (value != text) return@firstOrNull false
+                    val origAsciiNoSp = NomDictionary
+                        .stripDiacritics(origKey.lowercase()).replace(" ", "")
+                    origAsciiNoSp.startsWith(consumedRawAsciiNoSp) &&
+                        origAsciiNoSp.length >= consumedRawAsciiNoSp.length
+                }?.first
+        } else null
+        val effectivePartialLearnKey = partialBundledKey ?: partialUserKey ?: partialLearnKey
         lockedHistory.addLast(
             LockedStep(
                 rawConsumed = consumedRaw,
                 nomText = text,
-                isShorthand = partialLearnKey.isNotEmpty(),
-                learnKey = partialLearnKey,
+                isShorthand = needsPartialRecovery || partialBundledKey != null ||
+                    partialUserKey != null,
+                learnKey = effectivePartialLearnKey,
             )
         )
         lockedPrefix += text
@@ -826,6 +923,10 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         } else {
             val singleOnly = prefs.getBoolean("pref_single_syl_single_char_only", false)
             val isSingleSyllable = !composing.contains(' ')
+            // Strict mode when the user has turned lenient matching off. Propagated
+            // into every lookup path so tone-stripped user entries don't leak across
+            // toned queries (e.g. `tâm` must NOT match a user-dict `tam: 三`).
+            val strict = !prefs.getBoolean("pref_lenient_match", true)
             val flat = if (singleOnly && isSingleSyllable) {
                 // Single-syllable-only mode: restrict to single-character hits so we
                 // never surface compounds like 國家 just because the user typed "qu".
@@ -838,11 +939,11 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                 // a full syllable, which felt broken.
                 val trimmed = composing.trim()
                 val merged = LinkedHashSet<String>()
-                merged.addAll(NomDictionary.lookupSingle(trimmed))
-                merged.addAll(NomDictionary.lookupSinglePrefix(trimmed))
+                merged.addAll(NomDictionary.lookupSingle(trimmed, strict))
+                merged.addAll(NomDictionary.lookupSinglePrefix(trimmed, strict = strict))
                 merged.toList()
             } else {
-                NomDictionary.lookup(composing.trim())
+                NomDictionary.lookup(composing.trim(), strict)
             }
             val ordered = flat.sortedWith(
                 compareByDescending<String> { recentCounts.getOrDefault(it, 0) }
@@ -959,6 +1060,21 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         val hits = LinkedHashMap<String, Hit>()
         for (k in segments.size downTo 2) {
             val prefix = segments.subList(0, k)
+            // User dictionary first so learned phrases outrank the bundled ones at
+            // tie-break time (we iterate in descending k, so the first insert wins
+            // the consumed value and the subsequent bundled pass only upgrades if
+            // consumed grows – which won't happen at the same k).
+            for ((origKey, values) in UserDictionary.lookupWordByVietTat(prefix)) {
+                for (v in values) {
+                    val prev = hits[v]
+                    if (prev == null) {
+                        hits[v] = Hit(k, origKey)
+                    } else if (prev.consumed < k) {
+                        prev.consumed = k
+                        prev.origKey = origKey
+                    }
+                }
+            }
             for ((origKey, values) in NomDictionary.lookupWordByVietTat(prefix)) {
                 for (v in values) {
                     val prev = hits[v]
@@ -1025,23 +1141,26 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
     private fun gatherSegmentCandidates(raw: String): Pair<List<String>, IntArray> {
         val syllables = splitSyllables(raw)
         if (syllables.isEmpty()) return Pair(emptyList(), IntArray(0))
+        // Strict mode forwarded into every lookup so lenient-off actually suppresses
+        // tone-insensitive user-dict hits. See [updateComposing] for rationale.
+        val strict = !prefs.getBoolean("pref_lenient_match", true)
         // consumedFor[text] = best (= largest) consumed count we've seen for this text.
         val consumedFor = LinkedHashMap<String, Int>()
         for (k in syllables.size downTo 1) {
             val prefix = syllables.subList(0, k).joinToString(" ")
             if (k > 1) {
-                for (hit in NomDictionary.lookupWord(prefix)) {
+                for (hit in NomDictionary.lookupWord(prefix, strict)) {
                     val prev = consumedFor[hit]
                     if (prev == null || prev < k) consumedFor[hit] = k
                 }
             } else {
                 // Single syllable: use both lookupWord (which also handles 1-syllable
                 // compounds in the word index) and lookupSingle for character-level matches.
-                for (hit in NomDictionary.lookupWord(prefix)) {
+                for (hit in NomDictionary.lookupWord(prefix, strict)) {
                     val prev = consumedFor[hit]
                     if (prev == null || prev < k) consumedFor[hit] = k
                 }
-                for (hit in NomDictionary.lookupSingle(prefix)) {
+                for (hit in NomDictionary.lookupSingle(prefix, strict)) {
                     val prev = consumedFor[hit]
                     if (prev == null || prev < k) consumedFor[hit] = k
                 }
@@ -1056,10 +1175,10 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // typed so far (e.g. "bình k"), not just when the full key is typed verbatim.
         // User-dict hits come first so recent learnings float to the top.
         val prefixRaw = raw.replace(" ", "")
-        for (hit in UserDictionary.lookupPrefix(raw, 24)) {
+        for (hit in UserDictionary.lookupPrefix(raw, 24, strict)) {
             if (!consumedFor.containsKey(hit)) consumedFor[hit] = syllables.size
         }
-        for (hit in NomDictionary.lookupPrefix(prefixRaw, 24)) {
+        for (hit in NomDictionary.lookupPrefix(prefixRaw, 24, strict)) {
             // Don't let prefix completions override better (longer-exact) consumed values.
             if (!consumedFor.containsKey(hit)) consumedFor[hit] = syllables.size
         }
@@ -1175,6 +1294,16 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         val seen = HashSet<String>()
         for (s in subs) {
             if (!seen.add(s.key)) continue
+            // Skip entries already covered verbatim by the bundled dictionary – no point
+            // duplicating the built-in data, it only bloats the exported TSV and clutters
+            // the user-dictionary management UI. We try both word-level and single-level
+            // containment (the latter matters for 1-syllable keys produced by the tail
+            // branch of a short phrase). Tone-insensitive via the ascii indices inside
+            // [NomDictionary], so "quoc gia" won't re-learn "國家" that's already keyed
+            // under "quốc gia" in the bundle.
+            val alreadyBundled = NomDictionary.bundledWordContains(s.key, s.nom) ||
+                NomDictionary.bundledSingleContains(s.key, s.nom)
+            if (alreadyBundled) continue
             val prev = existing[s.key].orEmpty()
             val merged = LinkedHashSet<String>()
             // New Nom wins the top slot so just-used phrases surface first next time.
