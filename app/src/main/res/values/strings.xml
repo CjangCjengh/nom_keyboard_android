@@ -21,6 +21,10 @@
     <string name="pref_single_syl_single_char_only_summary">Khi đang gõ một âm tiết duy nhất (hoặc một phần của nó), chỉ hiện chữ Hán Nôm đơn tự; các từ ghép nhiều chữ sẽ chỉ xuất hiện khi bạn đã nhập đủ nhiều âm tiết</string>
     <string name="pref_shorthand">Viết tắt</string>
     <string name="pref_shorthand_summary">Khi chuỗi chữ bạn gõ không thể là một âm tiết tiếng Việt bình thường (ví dụ nhma, nch), bàn phím sẽ tự chia thành các tiền tố âm tiết (nh\'ma, n\'ch) và gợi ý các từ ghép khớp từng đoạn, hoặc chữ Hán Nôm đơn tự cho đoạn đầu tiên.</string>
+    <string name="pref_lenient_match">Khớp khoan dung</string>
+    <string name="pref_lenient_match_summary">Bỏ qua khác biệt về dấu phụ và dấu thanh khi tra từ điển (ví dụ gõ ngao vẫn ra ngạo). Tắt để chỉ khớp chính xác âm đọc có dấu; khác biệt giữa kiểu cũ và kiểu mới (hóa ↔ hoá, thúy ↔ thuý) vẫn được chấp nhận.</string>
+    <string name="pref_auto_learn_segment">Tự thêm vào từ điển</string>
+    <string name="pref_auto_learn_segment_summary">Khi gõ xong một cụm ở chế độ chuyển đổi theo đoạn, tự lưu cụm đó và các đoạn con vào từ điển người dùng để lần sau có thể gõ trực tiếp.</string>
     <string name="pref_ngram_n">Độ dài n-gram ghi nhớ</string>
     <string name="pref_ngram_n_summary">Số chữ Hán Nôm liên tiếp mà bàn phím sẽ học để gợi ý thông minh hơn theo ngữ cảnh</string>
     <string name="pref_ngram_export">Xuất tần suất n-gram</string>

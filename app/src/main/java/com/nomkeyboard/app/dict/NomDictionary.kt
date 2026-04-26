@@ -242,11 +242,39 @@ object NomDictionary {
      * ranked 10th in the `quan` values list, was previously missed because the
      * default cap of 24 was filled up by other q-syllables first).
      */
-    fun lookupSinglePrefix(prefix: String, limit: Int = 500): List<String> {
+    fun lookupSinglePrefix(prefix: String, limit: Int = 500, strict: Boolean = false): List<String> {
         if (prefix.isEmpty()) return emptyList()
+        val result = LinkedHashSet<String>()
+        if (strict) {
+            // Strict: match against ORIGINAL keys (tones required). Normalise the
+            // user's query so old-style tone placement still hits new-style keys.
+            val pNorm = ToneStyle.normaliseToNewStyle(prefix.lowercase()).trim()
+            if (pNorm.isEmpty()) return emptyList()
+            // Exact match first so typing a complete syllable promotes its entries.
+            singleMap[pNorm]?.let { values ->
+                for (v in values) {
+                    result.add(v)
+                    if (result.size >= limit) return result.toList()
+                }
+            }
+            val longer = ArrayList<String>()
+            for (key in singleMap.keys) {
+                if (key.length > pNorm.length && key.startsWith(pNorm)) longer.add(key)
+            }
+            longer.sortWith(compareBy({ it.length }, { it }))
+            for (key in longer) {
+                if (result.size >= limit) break
+                singleMap[key]?.let { values ->
+                    for (v in values) {
+                        result.add(v)
+                        if (result.size >= limit) break
+                    }
+                }
+            }
+            return result.toList()
+        }
         val p = stripDiacritics(prefix.lowercase())
         if (p.isEmpty()) return emptyList()
-        val result = LinkedHashSet<String>()
         // First: prefer exact-ascii hits (these are usually the "right" pronunciation).
         asciiSingleIndex[p]?.forEach { k ->
             singleMap[k]?.let { values ->
@@ -360,17 +388,29 @@ object NomDictionary {
 
     /**
      * Look up candidates for a single Vietnamese syllable (with or without diacritics).
-     * Order:
-     *   1. exact match (with diacritics),
-     *   2. all entries whose ascii form equals the query's ascii form (deduplicated).
+     *
+     * When [strict] is false (the default, "lenient" match), we fall back to the
+     * ascii index so any combination of missing / extra tones or other diacritic
+     * differences still finds hits – convenient but can surface noisy candidates
+     * when the user actually cares about tones. When [strict] is true, only the
+     * exact (tone-sensitive) key matches; old↔new style orthographic differences
+     * (`hóa ↔ hoá`, `thúy ↔ thuý`) are handled by normalising the query to the
+     * bundled dictionary's new-style form before the exact lookup.
      */
-    fun lookupSingle(query: String): List<String> {
+    fun lookupSingle(query: String, strict: Boolean = false): List<String> {
         if (query.isEmpty()) return emptyList()
         val q = query.lowercase()
         val result = LinkedHashSet<String>()
         // User dictionary hits take priority so the user's overrides float to the top.
         result.addAll(UserDictionary.lookupSingle(q))
         singleMap[q]?.let { result.addAll(it) }
+        if (strict) {
+            // Also try the new-style-normalised form so old-style user input like
+            // `hóa` still hits the bundled `hoá` entry.
+            val qNorm = ToneStyle.normaliseToNewStyle(q)
+            if (qNorm != q) singleMap[qNorm]?.let { result.addAll(it) }
+            return result.toList()
+        }
         val qAscii = stripDiacritics(q)
         asciiSingleIndex[qAscii]?.forEach { k ->
             singleMap[k]?.let { result.addAll(it) }
@@ -380,9 +420,13 @@ object NomDictionary {
 
     /**
      * Look up candidates for a compound word (possibly multi-syllable).
-     * Tries several normalisations: original / no-space / ascii / ascii-no-space.
+     *
+     * Lenient mode ([strict] = false) also matches via the ascii index, so
+     * missing diacritics still surface results. Strict mode restricts to exact
+     * tone-sensitive keys, with old↔new style normalisation applied to the
+     * query so `hóa hồng` still finds the dictionary's `hoá hồng`.
      */
-    fun lookupWord(query: String): List<String> {
+    fun lookupWord(query: String, strict: Boolean = false): List<String> {
         if (query.isEmpty()) return emptyList()
         val q = query.lowercase()
         val result = LinkedHashSet<String>()
@@ -390,6 +434,14 @@ object NomDictionary {
         result.addAll(UserDictionary.lookupWord(q))
         wordMap[q]?.let { result.addAll(it) }
         wordMap[q.replace(" ", "")]?.let { result.addAll(it) }
+        if (strict) {
+            val qNorm = ToneStyle.normaliseToNewStyle(q)
+            if (qNorm != q) {
+                wordMap[qNorm]?.let { result.addAll(it) }
+                wordMap[qNorm.replace(" ", "")]?.let { result.addAll(it) }
+            }
+            return result.toList()
+        }
         val qAscii = stripDiacritics(q)
         asciiWordIndex[qAscii]?.forEach { k -> wordMap[k]?.let { result.addAll(it) } }
         val qAsciiNoSp = qAscii.replace(" ", "")
@@ -409,19 +461,19 @@ object NomDictionary {
      * that only appear as single-syllable readings (e.g. 關 under `quan`) because the
      * compound-prefix sweep only looks at multi-syllable words.
      */
-    fun lookup(query: String): List<String> {
+    fun lookup(query: String, strict: Boolean = false): List<String> {
         if (query.isEmpty()) return emptyList()
         val merged = LinkedHashSet<String>()
-        merged.addAll(lookupWord(query))
-        merged.addAll(lookupSingle(query))
+        merged.addAll(lookupWord(query, strict))
+        merged.addAll(lookupSingle(query, strict))
         // User dictionary prefix matches come first so user-added compound completions win.
         merged.addAll(UserDictionary.lookupPrefix(query, PREFIX_LIMIT))
-        merged.addAll(lookupPrefix(query, PREFIX_LIMIT))
+        merged.addAll(lookupPrefix(query, PREFIX_LIMIT, strict))
         // Fold in single-char prefix hits when the query is still a single (possibly
         // partial) syllable – otherwise typing just `q` would surface multi-syllable
         // matches only, hiding every single-character candidate that reads `qu*`.
         if (!query.contains(' ')) {
-            merged.addAll(lookupSinglePrefix(query))
+            merged.addAll(lookupSinglePrefix(query, strict = strict))
         }
         return merged.toList()
     }
@@ -433,11 +485,34 @@ object NomDictionary {
      *
      * The returned list is capped at [limit] entries to keep the candidate strip responsive.
      */
-    fun lookupPrefix(query: String, limit: Int = PREFIX_LIMIT): List<String> {
+    fun lookupPrefix(query: String, limit: Int = PREFIX_LIMIT, strict: Boolean = false): List<String> {
         if (query.isEmpty()) return emptyList()
+        val result = LinkedHashSet<String>()
+        if (strict) {
+            // Strict: prefix-match on the original (tone-sensitive) keys. Apply
+            // old->new tone-style normalisation so `hóa` also matches `hoá`-keyed
+            // compounds. Compare both with and without spaces to mirror the
+            // lenient path (user may or may not have typed the syllable gap).
+            val qNorm = ToneStyle.normaliseToNewStyle(query.lowercase()).trim()
+            if (qNorm.isEmpty()) return emptyList()
+            val qNormNoSp = qNorm.replace(" ", "")
+            for (key in wordMap.keys) {
+                if (result.size >= limit) break
+                val keyNoSp = key.replace(" ", "")
+                val hits = (key.length > qNorm.length && key.startsWith(qNorm)) ||
+                    (keyNoSp.length > qNormNoSp.length && keyNoSp.startsWith(qNormNoSp))
+                if (!hits) continue
+                wordMap[key]?.let { values ->
+                    for (v in values) {
+                        result.add(v)
+                        if (result.size >= limit) break
+                    }
+                }
+            }
+            return result.toList()
+        }
         val qAscii = stripDiacritics(query.lowercase()).replace(" ", "")
         if (qAscii.isEmpty()) return emptyList()
-        val result = LinkedHashSet<String>()
         for ((asciiKey, originals) in asciiWordIndex) {
             if (result.size >= limit) break
             if (asciiKey.length > qAscii.length && asciiKey.startsWith(qAscii)) {

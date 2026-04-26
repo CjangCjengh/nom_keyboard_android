@@ -562,14 +562,17 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             val kSh = consumed.coerceIn(1, segs.size)
             // Look up the bundled-dictionary original key for this candidate (if any).
             // This is the "real" Vietnamese reading (e.g. "việt nam" for 越南 picked via
-            // "vn") that [learnUserPhrases] will key the mapping on. We normalise it to
-            // lowercase + ascii + space-joined so future queries that type the full
-            // reading can find it. Empty string when no reading is available (e.g. the
-            // candidate came from a single-char prefix hit, not a compound lookup).
+            // "vn", or "bình kiều" for 病嬌 picked via "bkieu") that [learnUserPhrases]
+            // will key the mapping on. We preserve the original tones verbatim
+            // (lowercase + whitespace-normalised) so the user dictionary records the
+            // true Vietnamese spelling instead of a tone-stripped ascii blob like
+            // "binh kieu" or "quan tam". UserDictionary itself builds an ascii index
+            // internally, so future lookups with or without tones still hit. Empty
+            // string when no reading is available (e.g. the candidate came from a
+            // single-char prefix hit, not a compound lookup).
             val rawOrigKey = currentShorthandOrigKeys.getOrElse(index) { "" }
             val learnKey = if (rawOrigKey.isEmpty()) "" else
-                NomDictionary.stripDiacritics(rawOrigKey.lowercase())
-                    .replace(Regex("\\s+"), " ").trim()
+                rawOrigKey.lowercase().replace(Regex("\\s+"), " ").trim()
             // If this pick covers every remaining segment -> FINAL: commit lockedPrefix +
             // text and clear all state. The n-gram model learns the character sequence;
             // [learnUserPhrases] picks up any step that carries a non-empty [learnKey] so
@@ -1117,6 +1120,12 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
      */
     private fun learnUserPhrases(steps: List<LockedStep>) {
         if (steps.isEmpty()) return
+        // Respect the "auto-learn after segment-mode picks" preference. When the
+        // user disables it, every path that would have registered a new phrase
+        // into the user dictionary (segment picks, shorthand compound picks,
+        // shorthand tails …) becomes a no-op. The n-gram frequency model is
+        // untouched; only user-dictionary entries are skipped here.
+        if (!prefs.getBoolean("pref_auto_learn_segment", true)) return
         // Drop steps that have no usable reading: a shorthand step is usable only when
         // it carries a non-empty [learnKey] (set by the pick handler when the
         // candidate came from a bundled-dictionary compound, e.g. "vn" -> "việt nam");

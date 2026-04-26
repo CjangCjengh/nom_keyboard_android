@@ -21,6 +21,10 @@
     <string name="pref_single_syl_single_char_only_summary">When you have typed only one syllable (or part of one), show single-character Nom candidates only; multi-character words will appear only once you have entered enough syllables</string>
     <string name="pref_shorthand">Viết tắt</string>
     <string name="pref_shorthand_summary">When what you\'ve typed cannot be a normal Vietnamese syllable (e.g. nhma, nch), the keyboard auto-splits it into syllable prefixes (nh\'ma, n\'ch) and suggests compound words that match segment-by-segment, as well as single-character candidates for the first segment.</string>
+    <string name="pref_lenient_match">Lenient match</string>
+    <string name="pref_lenient_match_summary">Ignore diacritic and tone-mark differences when looking up the dictionary (e.g. typing ngao still finds ngạo). Turn off for strict tone-sensitive matching; the old ↔ new orthography (hóa ↔ hoá, thúy ↔ thuý) is still accepted.</string>
+    <string name="pref_auto_learn_segment">Auto-add to dictionary</string>
+    <string name="pref_auto_learn_segment_summary">After finishing a phrase in segment mode, automatically save it and its sub-phrases to the user dictionary so it can be typed directly next time.</string>
     <string name="pref_ngram_n">N-gram learning length</string>
     <string name="pref_ngram_n_summary">How many consecutive Nom characters the keyboard learns to give smarter context-aware suggestions</string>
     <string name="pref_ngram_export">Export n-gram frequencies</string>
