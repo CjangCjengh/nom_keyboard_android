@@ -44,4 +44,16 @@
         <item>5</item>
         <item>6</item>
     </string-array>
+    <string-array name="font_size_entries">
+        <item>Nhỏ</item>
+        <item>Vừa (mặc định)</item>
+        <item>Lớn</item>
+        <item>Rất lớn</item>
+    </string-array>
+    <string-array name="font_size_values">
+        <item>s</item>
+        <item>m</item>
+        <item>l</item>
+        <item>xl</item>
+    </string-array>
 </resources>

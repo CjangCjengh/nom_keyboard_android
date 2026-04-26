@@ -73,6 +73,14 @@
         android:summary="@string/pref_show_candidates_summary"
         android:defaultValue="true" />
 
+    <ListPreference
+        android:key="pref_candidate_text_size"
+        android:title="@string/pref_candidate_text_size"
+        android:summary="@string/pref_candidate_text_size_summary"
+        android:entries="@array/font_size_entries"
+        android:entryValues="@array/font_size_values"
+        android:defaultValue="m" />
+
     <SwitchPreferenceCompat
         android:key="pref_auto_caps"
         android:title="@string/pref_auto_caps"

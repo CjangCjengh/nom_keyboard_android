@@ -44,4 +44,16 @@
         <item>5</item>
         <item>6</item>
     </string-array>
+    <string-array name="font_size_entries">
+        <item>Small</item>
+        <item>Medium (default)</item>
+        <item>Large</item>
+        <item>Extra large</item>
+    </string-array>
+    <string-array name="font_size_values">
+        <item>s</item>
+        <item>m</item>
+        <item>l</item>
+        <item>xl</item>
+    </string-array>
 </resources>
