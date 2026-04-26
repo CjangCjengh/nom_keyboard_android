@@ -4,6 +4,13 @@
     <string name="ime_name">Bàn phím Hán Nôm</string>
     <string name="subtype_vi">Tiếng Việt (Hán Nôm)</string>
 
+    <!-- UI sections / hero -->
+    <string name="app_tagline">Gõ chữ Hán Nôm ngay trên bàn phím Việt</string>
+    <string name="section_setup">Khởi động</string>
+    <string name="section_try">Thử bàn phím</string>
+    <string name="section_prefs">Tuỳ chọn</string>
+    <string name="section_data">Dữ liệu &amp; từ điển</string>
+
     <string name="settings_title">Cài đặt</string>
     <string name="enable_ime_title">1. Bật bàn phím</string>
     <string name="enable_ime_summary">Mở Cài đặt hệ thống · Ngôn ngữ và bàn phím · Quản lý bàn phím, rồi bật Bàn phím Hán Nôm</string>

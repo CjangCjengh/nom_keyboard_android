@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 顶部 Hero Header 的渐变背景：深蓝 -> 稍亮的蓝，底部做 24dp 圆角 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:type="linear"
+        android:angle="270"
+        android:startColor="@color/brand_deep_blue"
+        android:centerColor="@color/brand_deep_blue_soft"
+        android:endColor="@color/brand_deep_blue" />
+    <corners
+        android:topLeftRadius="0dp"
+        android:topRightRadius="0dp"
+        android:bottomLeftRadius="28dp"
+        android:bottomRightRadius="28dp" />
+</shape>

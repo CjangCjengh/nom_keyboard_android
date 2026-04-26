@@ -4,6 +4,13 @@
     <string name="ime_name">Nom Keyboard</string>
     <string name="subtype_vi">Vietnamese (Hán Nôm)</string>
 
+    <!-- UI sections / hero -->
+    <string name="app_tagline">Type Hán Nôm right on your Vietnamese keyboard</string>
+    <string name="section_setup">Getting started</string>
+    <string name="section_try">Try the keyboard</string>
+    <string name="section_prefs">Preferences</string>
+    <string name="section_data">Data &amp; dictionary</string>
+
     <string name="settings_title">Settings</string>
     <string name="enable_ime_title">1. Enable keyboard</string>
     <string name="enable_ime_summary">Open System Settings · Language &amp; input · Manage keyboards, then enable Nom Keyboard</string>

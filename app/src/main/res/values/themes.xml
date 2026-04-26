@@ -1,13 +1,116 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- =============================================================== -->
+    <!-- 主应用主题：Material3 DayNight，绑定品牌色 token                  -->
+    <!-- =============================================================== -->
     <style name="Theme.NomKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/kb_accent_light</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <!-- 主色：深蓝（icon 底色） -->
+        <item name="colorPrimary">@color/brand_deep_blue</item>
+        <item name="colorOnPrimary">@color/brand_gold_soft</item>
+        <item name="colorPrimaryContainer">@color/brand_deep_blue_soft</item>
+        <item name="colorOnPrimaryContainer">@color/brand_gold_soft</item>
+
+        <!-- 次色：金黄（icon 字体色） -->
+        <item name="colorSecondary">@color/brand_gold_deep</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/brand_gold_soft</item>
+        <item name="colorOnSecondaryContainer">@color/brand_deep_blue</item>
+
+        <item name="colorTertiary">@color/brand_gold</item>
+        <item name="colorOnTertiary">@color/brand_deep_blue</item>
+
+        <item name="colorError">@color/brand_danger</item>
+
+        <!-- 表面 -->
+        <item name="android:colorBackground">@color/app_bg_light</item>
+        <item name="colorSurface">@color/app_surface_light</item>
+        <item name="colorSurfaceVariant">@color/app_surface_variant_light</item>
+        <item name="colorOnSurface">@color/app_text_primary_light</item>
+        <item name="colorOnSurfaceVariant">@color/app_text_secondary_light</item>
+        <item name="colorOutline">@color/app_outline_light</item>
+
+        <!-- 状态栏颜色跟随主色；浅色状态栏图标仅在亮色场景下启用 -->
+        <item name="android:statusBarColor">@color/brand_deep_blue</item>
+        <item name="android:navigationBarColor">?android:attr/colorBackground</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
+    <!-- IME 主题保持透明 -->
     <style name="Theme.NomKeyboard.IME" parent="android:Theme.DeviceDefault.Light">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsFloating">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+
+    <!-- =============================================================== -->
+    <!-- 复用 style                                                       -->
+    <!-- =============================================================== -->
+
+    <!-- 分组卡片内的小节标题 -->
+    <style name="TextAppearance.App.SectionTitle" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <!-- 分组卡片内的副标题 / 说明文字 -->
+    <style name="TextAppearance.App.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:lineSpacingMultiplier">1.15</item>
+    </style>
+
+    <!-- 顶部 Hero 区的 app 名 -->
+    <style name="TextAppearance.App.HeroTitle" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textColor">@color/brand_gold_soft</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <style name="TextAppearance.App.HeroSubtitle" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textColor">#CFD7EE</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <!-- 分组卡片：圆角 + 表面色 + 轻微阴影 -->
+    <style name="Widget.App.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">?attr/colorSurface</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="contentPadding">16dp</item>
+    </style>
+
+    <!-- 主按钮（实色填充） -->
+    <style name="Widget.App.Button" parent="Widget.Material3.Button">
+        <item name="cornerRadius">14dp</item>
+        <item name="android:paddingStart">18dp</item>
+        <item name="android:paddingEnd">18dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
+    <!-- 次按钮（描边） -->
+    <style name="Widget.App.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="cornerRadius">14dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
+    <!-- 文本按钮 -->
+    <style name="Widget.App.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="iconPadding">6dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
+    <!-- 危险文本按钮（"清空全部"） -->
+    <style name="Widget.App.Button.Danger" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">?attr/colorError</item>
+        <item name="iconTint">?attr/colorError</item>
+        <item name="iconPadding">6dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
 </resources>

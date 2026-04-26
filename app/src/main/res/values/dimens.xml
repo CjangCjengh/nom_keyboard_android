@@ -12,4 +12,10 @@
     <dimen name="kb_side_pad">4dp</dimen>
     <dimen name="kb_top_pad">6dp</dimen>
     <dimen name="kb_bottom_pad">10dp</dimen>
+
+    <!-- 设置 / 词典页 UI 相关 -->
+    <dimen name="app_screen_padding">16dp</dimen>
+    <dimen name="app_card_gap">12dp</dimen>
+    <dimen name="app_hero_padding">20dp</dimen>
+    <dimen name="app_hero_icon_size">48dp</dimen>
 </resources>

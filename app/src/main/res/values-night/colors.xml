@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark-mode overrides for app semantic colors (keyboard palette stays unchanged). -->
+    <color name="app_bg_light">@color/app_bg_dark</color>
+    <color name="app_surface_light">@color/app_surface_dark</color>
+    <color name="app_surface_variant_light">@color/app_surface_variant_dark</color>
+    <color name="app_outline_light">@color/app_outline_dark</color>
+    <color name="app_text_primary_light">@color/app_text_primary_dark</color>
+    <color name="app_text_secondary_light">@color/app_text_secondary_dark</color>
+    <color name="app_text_tertiary_light">@color/app_text_tertiary_dark</color>
+    <color name="brand_danger">@color/brand_danger_dark</color>
+</resources>

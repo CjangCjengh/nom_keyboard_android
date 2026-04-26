@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground">
 
+    <!-- ============================================================ -->
+    <!-- 顶部标题栏：深蓝渐变 + 标题 + 添加按钮                         -->
+    <!-- ============================================================ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="12dp"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_hero"
+        android:paddingStart="@dimen/app_hero_padding"
+        android:paddingEnd="@dimen/app_hero_padding"
+        android:paddingTop="22dp"
+        android:paddingBottom="22dp">
 
         <TextView
             android:id="@+id/tv_title"
@@ -17,68 +26,88 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/user_dict_title"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.HeroTitle" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_add"
+            style="@style/Widget.App.Button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/user_dict_add" />
+            android:text="@string/user_dict_add"
+            app:icon="@drawable/ic_add" />
     </LinearLayout>
 
+    <!-- ============================================================ -->
+    <!-- 次级操作栏：导入 / 导出 / 清空全部                             -->
+    <!-- ============================================================ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="@dimen/app_screen_padding"
+        android:paddingEnd="@dimen/app_screen_padding"
+        android:paddingTop="12dp"
+        android:paddingBottom="4dp">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_import"
+            style="@style/Widget.App.Button.Outlined"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/user_dict_import" />
+            android:text="@string/user_dict_import"
+            app:icon="@drawable/ic_import" />
 
         <View
             android:layout_width="8dp"
-            android:layout_height="match_parent" />
+            android:layout_height="1dp" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_export"
+            style="@style/Widget.App.Button.Outlined"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/user_dict_export" />
-
-        <View
-            android:layout_width="8dp"
-            android:layout_height="match_parent" />
-
-        <Button
-            android:id="@+id/btn_clear_all"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/user_dict_clear_all" />
+            android:text="@string/user_dict_export"
+            app:icon="@drawable/ic_export" />
     </LinearLayout>
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_clear_all"
+        style="@style/Widget.App.Button.Danger"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/app_screen_padding"
+        android:layout_marginEnd="@dimen/app_screen_padding"
+        android:text="@string/user_dict_clear_all"
+        app:icon="@drawable/ic_delete" />
+
+    <!-- ============================================================ -->
+    <!-- 空态：图标在上、文字在下；整体仍是一个 TextView，Kotlin 兼容   -->
+    <!-- ============================================================ -->
     <TextView
         android:id="@+id/tv_empty"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/user_dict_empty"
-        android:padding="24dp"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:gravity="center"
+        android:text="@string/user_dict_empty"
+        android:padding="32dp"
+        android:drawableTop="@drawable/ic_keyboard_empty"
+        android:drawablePadding="14dp"
+        android:textAppearance="@style/TextAppearance.App.Body"
         android:textSize="14sp"
         android:visibility="gone" />
 
+    <!-- 条目列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_entries"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="16dp" />
+        android:paddingStart="@dimen/app_screen_padding"
+        android:paddingEnd="@dimen/app_screen_padding"
+        android:paddingTop="8dp"
+        android:paddingBottom="20dp" />
 </LinearLayout>
