@@ -10,6 +10,8 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.preference.PreferenceManager
 import com.nomkeyboard.app.dict.NgramModel
 import com.nomkeyboard.app.dict.NomDictionary
@@ -109,6 +111,15 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
     private var shorthandActive: Boolean = false
     private var shorthandSegments: List<String> = emptyList()
 
+    /**
+     * True iff the PREVIOUS keystroke was a standalone-w shortcut (composing was empty or
+     * the syllable had no prior letters, and the engine appended ư/Ư). Used on the NEXT
+     * keystroke to distinguish `w` + `w` (undo the shortcut → literal `w`) from `u` + `w`
+     * + `w` (undo the merge → `uw`). Cleared on any non-engine buffer mutation (backspace,
+     * commit, focus change, shorthand, …).
+     */
+    private var lastWasStandaloneW: Boolean = false
+
     private var nomTypeface: Typeface? = null
 
     // Cache of the most-recently computed candidate list so that pressing Space can pick the
@@ -155,6 +166,20 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         val ctx: Context = this
         rootView = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
+            // Edge-to-edge friendliness: on devices with a gesture / 3-button navigation bar,
+            // the IME window extends under the system bars, so without this our bottom key row
+            // would sit beneath the nav bar and be partially obscured. Gboard solves this by
+            // padding the keyboard root by the nav-bar inset so the whole keyboard is lifted
+            // above the bar. We also respect the display cutout inset for landscape on
+            // notched devices. `ViewCompat` keeps this working all the way back to API 24.
+            ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
+                val bars = insets.getInsets(
+                    WindowInsetsCompat.Type.navigationBars() or
+                            WindowInsetsCompat.Type.displayCutout()
+                )
+                v.setPadding(bars.left, v.paddingTop, bars.right, bars.bottom)
+                insets
+            }
         }
         candidateBar = CandidateBar(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -298,6 +323,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
             // sentence starts fresh. Any other symbol (quotes, hyphen etc.) leaves the
             // context alone.
             if (isSentenceTerminator(ch)) NgramModel.resetContext()
+            lastWasStandaloneW = false
             return
         }
         // Shorthand (viết tắt) bypass: once we're in shorthand mode, Telex diacritic /
@@ -307,6 +333,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // verbatim and let [updateComposing] re-split the cluster.
         if (shorthandActive) {
             composing += ch
+            lastWasStandaloneW = false
             updateComposing()
             return
         }
@@ -319,13 +346,22 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // Tone-placement style: "old" = traditional (hóa / thúy), "new" = modern (hoá / thuý).
         // Only affects open-syllable diphthongs; closed syllables are unambiguous.
         val toneStyleOld = prefs.getString("pref_tone_style", "new") == "old"
-        val newTail = TelexEngine.apply(tail, ch, toneStyleOld)
+        // Capture the previous standalone-w flag and compute the new one via the engine's
+        // own predicate. The engine is authoritative about which branches count as a
+        // "standalone-w" (top branch for empty/non-letter tail, or pure-consonant-onset
+        // branch for tails like "ng" / "nh" / "th"). Cases like "u" + w or "ban" + w are
+        // correctly excluded because their syllables already contain a vowel.
+        val prevStandaloneW = lastWasStandaloneW
+        lastWasStandaloneW = TelexEngine.wouldBeStandaloneW(tail, ch)
+        val newTail = TelexEngine.apply(tail, ch, toneStyleOld, prevStandaloneW)
         composing = head + newTail
         updateComposing()
     }
-
     override fun onBackspace() {
         playKeyClickSound()
+        // Any backspace breaks the "previous keystroke was standalone-w" chain, so a
+        // subsequent 'w' must NOT be treated as the second half of a w+w undo.
+        lastWasStandaloneW = false
         // Priority 1: trim the composing (still-Vietnamese) tail character by character.
         if (composing.isNotEmpty()) {
             composing = composing.dropLast(1)
@@ -1363,6 +1399,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         currentShorthandOrigKeys = emptyArray()
         shorthandActive = false
         shorthandSegments = emptyList()
+        lastWasStandaloneW = false
         candidateBar.clear()
         currentInputConnection?.finishComposingText()
         maybeAutoShift()
@@ -1378,6 +1415,7 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         currentShorthandOrigKeys = emptyArray()
         shorthandActive = false
         shorthandSegments = emptyList()
+        lastWasStandaloneW = false
         if (::candidateBar.isInitialized) candidateBar.clear()
         currentInputConnection?.finishComposingText()
     }

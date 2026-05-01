@@ -157,8 +157,15 @@ object TelexEngine {
      *   - false (modern / new style): place it on the LAST vowel -> `hoá`, `hoè`, `thuý`, `quý`.
      * Closed syllables (with a trailing consonant) and syllables carrying a modified vowel
      * (ơ/ê/â/ô/ă) are unaffected – those rules are unambiguous across styles.
+     *
+     * [lastWasStandaloneW] tells the engine that the previous keystroke was a standalone-w
+     * shortcut (i.e. the ư/Ư currently at the tail of [composing] was produced by the top
+     * branch below, NOT by a u+w merge or cluster rewrite). This lets us distinguish
+     * `w` + `w` (undo the shortcut → plain literal `w`) from `u` + `w` + `w` (undo the merge
+     * → `uw`). Callers should set this flag whenever their previous call hit the standalone
+     * branch and clear it on any other buffer mutation (backspace, commit, …).
      */
-    fun apply(composing: String, ch: Char, toneStyleOld: Boolean = true): String {
+    fun apply(composing: String, ch: Char, toneStyleOld: Boolean = true, lastWasStandaloneW: Boolean = false): String {
         // "w" typed on its own (no prior letters, at word start, or after a non-letter) expands
         // to "ư" – a very common shortcut most Vietnamese Telex engines provide.
         if ((ch == 'w' || ch == 'W') && (composing.isEmpty() || !composing.last().isLetter())) {
@@ -167,6 +174,21 @@ object TelexEngine {
         }
 
         if (composing.isEmpty()) return ch.toString()
+
+        // 0a. Standalone-w "second press" undo: if the previous keystroke was a standalone-w
+        //     shortcut (producing the ư/Ư at the tail) and the user is now pressing 'w'/'W'
+        //     again, strip that ư/Ư and append a literal 'w'/'W' instead – so pressing w
+        //     twice in a row effectively cancels the shortcut and gives back a single
+        //     literal w. This differs from the generic undo-merge below (which would give
+        //     "uw"): without the u prefix there was no u to undo.
+        //     Examples: ""   + w -> "ư"; then "ư" + w (flag set) -> "w"
+        //               "ng" + w -> "ngư"; then "ngư" + w (flag set) -> "ngw"
+        if ((ch == 'w' || ch == 'W') && lastWasStandaloneW) {
+            val last = composing.last()
+            if (last == 'ư' || last == 'Ư') {
+                return composing.dropLast(1) + ch
+            }
+        }
 
         // 0. Restore-original (undo) shortcut: if the trailing character is a modified vowel
         //    whose producer was exactly this trigger key, un-merge back to the two literal
@@ -833,5 +855,37 @@ object TelexEngine {
     fun isTelexTriggerChar(ch: Char): Boolean {
         val lower = ch.lowercaseChar()
         return lower in "sfrxjz" || lower in "awedo"
+    }
+
+    /**
+     * Predicate used by callers (the IME service) to decide whether the `w/W` keystroke
+     * they're about to pass to [apply] would land in one of the "standalone-w" branches
+     * that append a brand-new ư/Ư. Those branches are:
+     *   - top branch: composing empty or last char is a non-letter (e.g. `"" + w → ư`,
+     *     `"'" + w → "'ư"`);
+     *   - pure-consonant-onset branch inside [rewriteHornForW]: the current syllable has
+     *     letters but none of them are vowel-like (e.g. `"ng" + w → "ngư"`).
+     *
+     * The caller uses this to set the `lastWasStandaloneW` flag so that a subsequent `w`
+     * key can be recognised as the "cancel the shortcut" second press and get the literal
+     * `w` back instead of the generic `uw` un-merge.
+     *
+     * [tail] is the current last-syllable slice of the composing buffer (i.e. what the
+     * service would pass to [apply]).
+     */
+    fun wouldBeStandaloneW(tail: String, ch: Char): Boolean {
+        if (ch != 'w' && ch != 'W') return false
+        // Locate the start of the trailing letter run (== current syllable).
+        var start = tail.length
+        for (i in tail.indices.reversed()) {
+            if (!tail[i].isLetter()) break
+            start = i
+        }
+        // Standalone-w iff the syllable run is empty (top branch) OR contains no vowel-like
+        // letter (pure consonant onset).
+        for (i in start until tail.length) {
+            if (tail[i].isVowelLike()) return false
+        }
+        return true
     }
 }
