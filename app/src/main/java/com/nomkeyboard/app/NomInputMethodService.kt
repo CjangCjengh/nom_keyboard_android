@@ -1046,6 +1046,12 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         // "anh", "an") so we never hijack those. For "qg", "nma", "tsao" etc. it returns
         // false and we proceed.
         if (NomDictionary.hasAsciiSinglePrefix(asciiLower)) return null
+        // The dictionary only knows readings that have a Chữ Nôm character, so legal
+        // Vietnamese syllables like "my" / "sy" are missing from it. Without this guard
+        // the gate would hijack them into shorthand mode and a subsequent tone trigger
+        // ('x' for "mỹ") would be appended literally instead of applied by Telex.
+        // See [TelexEngine.isValidVietnameseSyllableShape] for the rationale.
+        if (TelexEngine.isValidVietnameseSyllableShape(asciiLower)) return null
 
         // Multi-letter consonant onsets, longest-first so "ngh" beats "ng" beats "n".
         // Kept intentionally tight (no "qu"/"gi" – those imply a vowel will follow, which

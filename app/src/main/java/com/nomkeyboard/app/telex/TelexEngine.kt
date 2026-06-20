@@ -858,6 +858,65 @@ object TelexEngine {
     }
 
     /**
+     * Cheap Vietnamese-syllable-shape check on a diacritic-stripped, lowercased ascii
+     * buffer (only a-z). Returns true iff [ascii] has the shape of a single well-formed
+     * Vietnamese syllable: an optional legal consonant onset, exactly one contiguous
+     * vowel cluster, and an optional legal consonant coda.
+     *
+     * Used by the viết-tắt (shorthand) activation gate: the single-syllable Nom
+     * dictionary only covers readings that have a corresponding Chữ Nôm character, so
+     * perfectly legal Vietnamese syllables such as "my" (→ "mỹ") or "sy" (→ "sỹ") are
+     * NOT in it. Without this check the gate sees no dictionary prefix for "my" and
+     * hijacks it into shorthand mode, after which a tone trigger like 'x' is appended
+     * literally ("myx") instead of producing "mỹ" (see the shorthand bypass in
+     * NomInputMethodService.onChar). Valid syllable shapes stay on the normal Telex
+     * path; genuine shorthand clusters such as "vn" (no vowel), "tsao" (illegal
+     * onset "ts") or "nma" (illegal onset "nm") fail this check and correctly fall
+     * through to shorthand.
+     *
+     * We deliberately do NOT validate the vowel nucleus itself (which diphthongs are
+     * legal etc.) – any single contiguous vowel run is accepted. The gate only needs to
+     * tell "this is syllable-shaped, give Telex a chance" from "this is a consonant
+     * cluster the user is abbreviating".
+     */
+    fun isValidVietnameseSyllableShape(ascii: String): Boolean {
+        val vowels = "aeiouy"
+        var start = -1
+        var end = -1
+        var runs = 0
+        var inRun = false
+        for (i in ascii.indices) {
+            val v = ascii[i] in vowels
+            if (v && !inRun) {
+                runs++
+                start = i
+                end = i
+            }
+            if (v) end = i + 1
+            inRun = v
+        }
+        // Zero vowels (all consonants, e.g. "vn", "qg") or 2+ separate vowel runs
+        // (e.g. a consonant between two vowel clusters) cannot be a single syllable.
+        if (runs != 1) return false
+        val onset = ascii.substring(0, start)
+        val coda = ascii.substring(end)
+        return onset in VALID_ONSETS && coda in VALID_CODAS
+    }
+
+    // Legal Vietnamese syllable onsets (ascii, diacritic-stripped). Includes the empty
+    // onset for vowel-initial syllables ("an", "em", "yêu"…). The gi-/qu- glides are
+    // listed too, but in practice any "qu"+vowel / "gi"+vowel buffer is already a
+    // dictionary prefix and never reaches the gate that calls this.
+    private val VALID_ONSETS = setOf(
+        "", "b", "c", "ch", "d", "g", "gh", "gi", "h", "k", "kh", "l", "m", "n",
+        "ng", "ngh", "nh", "p", "ph", "qu", "r", "s", "t", "th", "tr", "v", "x"
+    )
+
+    // Legal Vietnamese syllable codas (ascii). Off-glides (i/u/y) are vowel-like so
+    // they stay inside the vowel run, never the coda.
+    private val VALID_CODAS = setOf("", "c", "ch", "m", "n", "ng", "nh", "p", "t")
+
+    /**
      * Predicate used by callers (the IME service) to decide whether the `w/W` keystroke
      * they're about to pass to [apply] would land in one of the "standalone-w" branches
      * that append a brand-new ư/Ư. Those branches are:
