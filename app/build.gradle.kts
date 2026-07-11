@@ -13,8 +13,8 @@ android {
         applicationId = "com.nomkeyboard.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.1.3"
+        versionCode = 7
+        versionName = "1.1.4"
     }
 
     // Keep the 12MB font uncompressed so that AssetFileDescriptor can mmap it at runtime.

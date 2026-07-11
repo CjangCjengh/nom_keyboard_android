@@ -275,16 +275,26 @@ object TelexEngine {
         // by a consonant like "nếuma" – and instead emit the trigger letter literally so the
         // user can keep typing foreign words / run-on syllables transparently.
         if (tone != null && composing.any { it.isVowelLike() } && isLastSyllablePhonotacticallyValid(composing)) {
-            val idx = findToneTargetIndex(composing, toneStyleOld)
-            if (idx >= 0) {
-                val v = composing[idx]
-                val base = toneReverse[v]?.first ?: v
-                val arr = toneMap[base]
-                if (arr != null) {
-                    val newCh = arr[tone]
-                    val sb = StringBuilder(composing)
-                    sb.setCharAt(idx, newCh)
-                    return sb.toString()
+            // 'z' is the "clear tone" trigger (tone 0). It only does something useful when
+            // the syllable actually carries a tone to strip. With no tone present the user is
+            // just typing the letter 'z', so we must NOT consume it here – otherwise
+            // findToneTargetIndex + arr[0] would no-op onto an already-untoned vowel and
+            // return the buffer unchanged, silently swallowing the 'z' (the reported bug:
+            // "ba" + z yielded "ba" instead of "baz"). Let it fall through to the literal
+            // append at the bottom.
+            val syllableHasTone = composing.any { (toneReverse[it]?.second ?: 0) != 0 }
+            if (tone != 0 || syllableHasTone) {
+                val idx = findToneTargetIndex(composing, toneStyleOld)
+                if (idx >= 0) {
+                    val v = composing[idx]
+                    val base = toneReverse[v]?.first ?: v
+                    val arr = toneMap[base]
+                    if (arr != null) {
+                        val newCh = arr[tone]
+                        val sb = StringBuilder(composing)
+                        sb.setCharAt(idx, newCh)
+                        return sb.toString()
+                    }
                 }
             }
         }
