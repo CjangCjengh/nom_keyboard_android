@@ -317,7 +317,14 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         if (!ch.isLetter() && ch != '\'' && ch != '-') {
             // Non-letter punctuation: commit whatever composing text we have as plain Vietnamese
             // (so we stay fully compatible with Quốc Ngữ typing) and then insert the raw symbol.
-            commitComposing()
+            //
+            // Always keep the trailing syllable-separator space that segment mode appended after
+            // the last syllable. The user typed that space on purpose, so it must survive into
+            // the committed text regardless of what follows: "sa" SPACE "3" -> "sa 3", "sa" SPACE
+            // "+" -> "sa +", "sa" SPACE "!" -> "sa !", "sa" SPACE ":" -> "sa :". Earlier this
+            // was gated on !isSentenceTerminator(ch) to avoid "sa .", but that swallowed spaces
+            // the user explicitly entered before punctuation, which is the very bug we're fixing.
+            commitComposing(keepTrailingSpace = true)
             currentInputConnection?.commitText(ch.toString(), 1)
             // Sentence-ending punctuation terminates the n-gram context so that the next
             // sentence starts fresh. Any other symbol (quotes, hyphen etc.) leaves the
@@ -388,18 +395,35 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
 
     override fun onEnter() {
         playKeyClickSound()
-        commitComposing()
+        // Keep the trailing syllable-separator space: "sá" SPACE ENTER must commit "sá " and
+        // then break the line, not swallow the space.
+        commitComposing(keepTrailingSpace = true)
         NgramModel.resetContext()
         val ei = currentInputEditorInfo
-        val action = ei?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: 0
-        when (action) {
-            EditorInfo.IME_ACTION_GO,
-            EditorInfo.IME_ACTION_SEARCH,
-            EditorInfo.IME_ACTION_SEND,
-            EditorInfo.IME_ACTION_DONE,
-            EditorInfo.IME_ACTION_NEXT -> currentInputConnection?.performEditorAction(action)
-            else -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+        val imeOptions = ei?.imeOptions ?: 0
+        // A multi-line editor (TYPE_TEXT_FLAG_MULTI_LINE) or one carrying
+        // IME_FLAG_NO_ENTER_ACTION is explicitly telling the IME: "Enter inserts a line break,
+        // do NOT run an action." Honour that even when the editor also advertises an action
+        // such as DONE – otherwise a multi-line field configured with actionDone would call
+        // performEditorAction(DONE) whose default handler hides the IME, so the panel retracts
+        // and no newline ever lands in the text (the reported bug).
+        val noEnterAction =
+            (imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0 ||
+                    ((ei?.inputType ?: 0) and EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+        val action = imeOptions and EditorInfo.IME_MASK_ACTION
+        if (!noEnterAction) {
+            when (action) {
+                EditorInfo.IME_ACTION_GO,
+                EditorInfo.IME_ACTION_SEARCH,
+                EditorInfo.IME_ACTION_SEND,
+                EditorInfo.IME_ACTION_DONE,
+                EditorInfo.IME_ACTION_NEXT -> {
+                    currentInputConnection?.performEditorAction(action)
+                    return
+                }
+            }
         }
+        sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
     }
 
     override fun onSpace() {
@@ -1380,10 +1404,22 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         return if (n == 0) 1 else n
     }
 
-    private fun commitComposing() {
+    /**
+     * Commit the in-flight composition to the editor as plain Vietnamese (Nom prefix + raw
+     * tail) and tear down all composing state.
+     *
+     * @param keepTrailingSpace when true the single trailing syllable-separator space that
+     *   segment mode may have appended (e.g. the trailing space in "sa ") is preserved in the
+     *   committed text instead of being trimmed away. Callers that follow the commit with a
+     *   character that a space naturally precedes (digits, "+", a newline …) pass true so
+     *   the user-typed space is not silently swallowed. Punctuation callers pass false
+     *   (the default) so "sa" SPACE "." still yields "sa." and never "sa .".
+     */
+    private fun commitComposing(keepTrailingSpace: Boolean = false) {
         if (!hasActiveComposition()) return
         // Final shape: Nom prefix (already-picked) + raw Vietnamese tail.
-        val text = composingDisplay().trimEnd()
+        val raw = composingDisplay()
+        val text = if (keepTrailingSpace) raw else raw.trimEnd()
         if (text.isNotEmpty()) {
             currentInputConnection?.commitText(text, 1)
             // Learn the Nom prefix only – the raw Vietnamese tail isn't Nom and shouldn't
@@ -1406,7 +1442,17 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         shorthandActive = false
         shorthandSegments = emptyList()
         lastWasStandaloneW = false
-        candidateBar.clear()
+        // A commit ends the composition, so the candidate bar has nothing left to show.
+        // Hide it here directly: clear() only empties the content, it does NOT touch
+        // visibility. Whether the bar actually disappeared used to depend on whether the
+        // caller also happened to call updateComposing() afterwards (picks / some space
+        // modes did, onChar / onEnter / onSymbol / the segment-mode commit branches did
+        // not) – which is why an empty candidate bar sometimes lingered in place after a
+        // commit. Setting GONE at the single choke point makes it consistent everywhere.
+        if (::candidateBar.isInitialized) {
+            candidateBar.clear()
+            candidateBar.visibility = View.GONE
+        }
         currentInputConnection?.finishComposingText()
         maybeAutoShift()
     }
@@ -1422,7 +1468,13 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         shorthandActive = false
         shorthandSegments = emptyList()
         lastWasStandaloneW = false
-        if (::candidateBar.isInitialized) candidateBar.clear()
+        // Same rationale as in [commitComposing]: clear() leaves visibility untouched, so
+        // hide the bar explicitly. resetComposing runs on field focus changes / input
+        // finish, where a stale bar from the previous field would otherwise linger empty.
+        if (::candidateBar.isInitialized) {
+            candidateBar.clear()
+            candidateBar.visibility = View.GONE
+        }
         currentInputConnection?.finishComposingText()
     }
 
