@@ -32,9 +32,25 @@ class CandidateBar @JvmOverloads constructor(
         fun onPickCandidate(index: Int, text: String)
         /** Fired when the user toggles the expand chevron. */
         fun onToggleExpand(expanded: Boolean) {}
+        /**
+         * Fired when the user taps a cell while the bar is in punctuation-strip mode (i.e.
+         * idle, no composition). The [text] is to be inserted verbatim – no Nom conversion.
+         */
+        fun onPunctuation(text: String) {}
     }
 
     var listener: OnCandidatePickListener? = null
+
+    /**
+     * Display mode for the bar. CANDIDATE = the normal composing-time candidate strip
+     * (Nom suggestions, tappable composing label on the left, optional expand chevron).
+     * PUNCTUATION = an idle quick-access row of common punctuation shown when nothing is
+     * being composed, so the bar's height is always occupied by something useful instead of
+     * vanishing and making the IME jump in height. The two modes share the same cell
+     * layout/draw/hit-test code; only the tap routing differs.
+     */
+    private enum class Mode { CANDIDATE, PUNCTUATION }
+    private var mode: Mode = Mode.CANDIDATE
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
@@ -131,6 +147,14 @@ class CandidateBar @JvmOverloads constructor(
     private var candidates: List<String> = emptyList()
     private val candidateRects = ArrayList<RectF>()
 
+    // Punctuation-mode lists. [punctuationCollapsed] is the single row shown when idle and
+    // collapsed (fullwidth OR halfwidth set, per the user preference); [punctuationExpanded]
+    // is the combined grid shown when the user expands the strip. `candidates` always holds
+    // whichever of the two is currently visible so the shared layout/draw/hit-test code
+    // doesn't need to care about the mode.
+    private var punctuationCollapsed: List<String> = emptyList()
+    private var punctuationExpanded: List<String> = emptyList()
+
     private var scrollX = 0f
     private var maxScrollX = 0f
     // Vertical scroll used only in expanded mode when candidates overflow the grid.
@@ -173,6 +197,8 @@ class CandidateBar @JvmOverloads constructor(
     }
 
     fun setComposing(text: String) {
+        // Showing the composing label means we're back in candidate mode.
+        mode = Mode.CANDIDATE
         if (composing != text) {
             composing = text
             scrollX = 0f
@@ -182,6 +208,7 @@ class CandidateBar @JvmOverloads constructor(
     }
 
     fun setCandidates(list: List<String>) {
+        mode = Mode.CANDIDATE
         candidates = list
         scrollX = 0f
         scrollY = 0f
@@ -189,7 +216,38 @@ class CandidateBar @JvmOverloads constructor(
         invalidate()
     }
 
+    /**
+     * Switch the bar to the idle punctuation strip.
+     *
+     * @param collapsed the single row shown while collapsed (fullwidth or halfwidth set,
+     *   chosen by the service according to the user preference).
+     * @param expandedList the combined grid shown when the user expands the strip (both
+     *   fullwidth and halfwidth, preferred set first).
+     *
+     * The items are laid out exactly like candidates (same cells, same draw path) but
+     * tapping one fires [onPunctuation] so the service inserts the character verbatim. No
+     * composing label is shown; the expand chevron IS shown so the user can pop out the full
+     * set. Calling this always returns the bar to the collapsed single row (it collapses
+     * first if it was left expanded from a previous idle session).
+     */
+    fun setPunctuationStrip(collapsed: List<String>, expandedList: List<String>) {
+        mode = Mode.PUNCTUATION
+        composing = ""
+        punctuationCollapsed = collapsed
+        punctuationExpanded = expandedList
+        candidates = collapsed
+        scrollX = 0f
+        scrollY = 0f
+        if (expanded) {
+            expanded = false
+            listener?.onToggleExpand(false)
+        }
+        layoutCandidates()
+        invalidate()
+    }
+
     fun clear() {
+        mode = Mode.CANDIDATE
         composing = ""
         candidates = emptyList()
         scrollX = 0f
@@ -251,11 +309,15 @@ class CandidateBar @JvmOverloads constructor(
         val totalContentWidth = x
         val viewportW = width.toFloat()
         // The chevron is only useful when the content can't fit; otherwise it would just
-        // eat horizontal space and partially cover the rightmost candidate.
+        // eat horizontal space and partially cover the rightmost candidate. In punctuation
+        // mode the chevron is ALWAYS shown (even when the short row fits): it's the user's
+        // way to pop out the full set (both fullwidth + halfwidth) without leaving the bar.
         val overflows = totalContentWidth > viewportW
-        chevronVisible = overflows
-        // Effective right edge that candidates are allowed to occupy.
-        val rightLimit = if (overflows) viewportW - chevronW else viewportW
+        chevronVisible = overflows || mode == Mode.PUNCTUATION
+        // Effective right edge that candidates are allowed to occupy. Tied to chevronVisible
+        // (not raw `overflows`) so that the chevron-width gap is reserved exactly when the
+        // chevron is drawn.
+        val rightLimit = if (chevronVisible) viewportW - chevronW else viewportW
         for (i in candidates.indices) {
             // Keep each candidate's cell at its natural width. We do NOT clamp the right
             // edge to `rightLimit` here: the cell is in CONTENT coordinates (the strip
@@ -461,12 +523,22 @@ class CandidateBar @JvmOverloads constructor(
                         downOnChevron -> {
                             expanded = !expanded
                             scrollY = 0f
+                            if (mode == Mode.PUNCTUATION) {
+                                // Swap to the combined grid when expanding, back to the
+                                // preferred single-row set when collapsing.
+                                candidates = if (expanded) punctuationExpanded else punctuationCollapsed
+                            }
                             layoutCandidates()
                             invalidate()
                             listener?.onToggleExpand(expanded)
                         }
                         downIndex >= 0 && downIndex < candidates.size -> {
-                            listener?.onPickCandidate(downIndex, candidates[downIndex])
+                            val text = candidates[downIndex]
+                            if (mode == Mode.PUNCTUATION) {
+                                listener?.onPunctuation(text)
+                            } else {
+                                listener?.onPickCandidate(downIndex, text)
+                            }
                         }
                         downOnComposing && composing.isNotEmpty() -> {
                             // Sentinel index -1 tells the IME to commit the raw composing text

@@ -55,6 +55,8 @@
     <string name="pref_sound_summary">Play a click sound when pressing keys</string>
     <string name="pref_show_candidates">Show Nom suggestion bar</string>
     <string name="pref_show_candidates_summary">Show Nom candidates above the keyboard, tap to commit</string>
+    <string name="pref_idle_fullwidth">Fullwidth punctuation in idle bar</string>
+    <string name="pref_idle_fullwidth_summary">When on, the idle punctuation strip shows fullwidth marks; turn off for halfwidth. Expand the strip to access both.</string>
     <string name="pref_candidate_text_size">Keyboard font size</string>
     <string name="pref_candidate_text_size_summary">Adjust the font size of the main keyboard keys and the suggestion bar</string>
     <string name="pref_auto_caps">Auto-capitalise sentences</string>

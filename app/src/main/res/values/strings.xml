@@ -55,6 +55,8 @@
     <string name="pref_sound_summary">Phát tiếng nhấp khi gõ phím</string>
     <string name="pref_show_candidates">Hiển thị thanh gợi ý Hán Nôm</string>
     <string name="pref_show_candidates_summary">Hiện các chữ Hán Nôm đề xuất phía trên bàn phím, chạm để chọn</string>
+    <string name="pref_idle_fullwidth">Dấu câu toàn giác ở thanh rảnh rỗi</string>
+    <string name="pref_idle_fullwidth_summary">Khi bật, thanh dấu câu (lúc không đang gõ) hiện dấu toàn giác; tắt để dùng dấu bán giác. Mở rộng thanh để dùng cả hai loại.</string>
     <string name="pref_candidate_text_size">Cỡ chữ bàn phím</string>
     <string name="pref_candidate_text_size_summary">Điều chỉnh cỡ chữ trên các phím và trên thanh gợi ý</string>
     <string name="pref_auto_caps">Tự động viết hoa đầu câu</string>

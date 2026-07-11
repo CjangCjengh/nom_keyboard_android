@@ -73,6 +73,12 @@
         android:summary="@string/pref_show_candidates_summary"
         android:defaultValue="true" />
 
+    <SwitchPreferenceCompat
+        android:key="pref_idle_fullwidth"
+        android:title="@string/pref_idle_fullwidth"
+        android:summary="@string/pref_idle_fullwidth_summary"
+        android:defaultValue="true" />
+
     <ListPreference
         android:key="pref_candidate_text_size"
         android:title="@string/pref_candidate_text_size"

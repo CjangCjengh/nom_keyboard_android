@@ -198,13 +198,14 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         }
 
         applyTheme()
-        // The candidate bar is always part of the layout but starts hidden. We toggle its
-        // visibility in [updateComposing] so that it appears only while the user is composing
-        // (and the user preference allows it). This matches Gboard: an always-visible strip
-        // wastes vertical space when there is nothing to suggest.
+        // The candidate bar is always part of the layout and stays visible for the whole
+        // session: while composing it shows Nom candidates, and while idle it shows a quick
+        // punctuation strip (see [showIdleStrip]). Keeping it perpetually visible means the
+        // IME's total height never jumps as the user starts/stops typing – the bar always
+        // occupies [kb_candidate_height], only its content changes.
         rootView.addView(candidateBar)
-        candidateBar.visibility = View.GONE
         rootView.addView(keyboardView)
+        showIdleStrip()
         return rootView
     }
 
@@ -288,10 +289,8 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
                 lockedHistory.clear()
                 currentCandidates = emptyList()
                 currentCandidateConsumed = IntArray(0)
-                if (::candidateBar.isInitialized) {
-                    candidateBar.clear()
-                    candidateBar.visibility = View.GONE
-                }
+                if (::candidateBar.isInitialized) candidateBar.clear()
+                showIdleStrip()
                 maybeAutoShift()
                 return
             }
@@ -576,6 +575,20 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         if (text.length == 1 && isSentenceTerminator(text[0])) {
             NgramModel.resetContext()
         }
+    }
+
+    /**
+     * Tap on the idle punctuation strip. The bar only shows the strip when there is no
+     * active composition, so this just inserts the character verbatim (no Nom conversion,
+     * no commit needed) and re-evaluates auto-capitalisation for sentence terminators.
+     */
+    override fun onPunctuation(text: String) {
+        playKeyClickSound()
+        currentInputConnection?.commitText(text, 1)
+        if (text.length == 1 && isSentenceTerminator(text[0])) {
+            NgramModel.resetContext()
+        }
+        maybeAutoShift()
     }
 
     override fun onSwitchLanguage() {
@@ -920,6 +933,43 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
     // ============================ Composing & candidate refresh ============================
 
     /**
+     * The two punctuation sets offered by the idle strip. The bar paints with the Han-Nom
+     * typeface, which carries CJK / fullwidth punctuation as well as ASCII, so both sets are
+     * safe here. The user preference [pref_idle_fullwidth] picks which set shows in the
+     * collapsed single row; expanding the strip (chevron) reveals both.
+     */
+    private val fullwidthPunctuation: List<String> =
+        listOf("，", "。", "、", "？", "！", "：", "；", "（", "）", "＂", "…", "—")
+    private val halfwidthPunctuation: List<String> =
+        listOf(",", ".", "?", "!", ":", ";", "(", ")", "\"", "'", "-", "/")
+
+    /**
+     * Fill the candidate bar with the idle punctuation strip (or hide it entirely if the user
+     * has turned the "show candidates" preference off – those users opted out of the bar and
+     * get a constant no-bar height instead). This is the single place that decides what the
+     * bar shows when there is no active composition, called from every commit / reset path so
+     * the bar never lingers empty and the IME height stays constant.
+     *
+     * The collapsed row shows the fullwidth or halfwidth set per [pref_idle_fullwidth]; the
+     * expanded grid carries both sets (preferred set first) so the toggle only decides which
+     * is the quick-access one without expanding.
+     */
+    private fun showIdleStrip() {
+        if (!::candidateBar.isInitialized) return
+        val showCandidate = prefs.getBoolean("pref_show_candidates", true)
+        if (!showCandidate) {
+            candidateBar.visibility = View.GONE
+            return
+        }
+        val fullwidth = prefs.getBoolean("pref_idle_fullwidth", true)
+        val collapsed = if (fullwidth) fullwidthPunctuation else halfwidthPunctuation
+        val expanded = if (fullwidth) fullwidthPunctuation + halfwidthPunctuation
+            else halfwidthPunctuation + fullwidthPunctuation
+        candidateBar.setPunctuationStrip(collapsed, expanded)
+        candidateBar.visibility = View.VISIBLE
+    }
+
+    /**
      * @return the string we push to the editor as the composing span. It is the user-visible
      *   "what am I about to commit" – Nom prefix (already picked) followed by the raw
      *   Vietnamese that still awaits conversion.
@@ -942,13 +992,14 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         if (!hasActiveComposition()) {
             ic.setComposingText("", 1)
             ic.finishComposingText()
-            candidateBar.clear()
             currentCandidates = emptyList()
             currentCandidateConsumed = IntArray(0)
             shorthandActive = false
             shorthandSegments = emptyList()
-            if (::candidateBar.isInitialized) candidateBar.visibility = View.GONE
             collapseCandidatesIfExpanded()
+            // Fill the now-idle bar with the punctuation strip (or hide it per the user
+            // preference) so the IME height stays constant across the composing/idle switch.
+            showIdleStrip()
             return
         }
         // The underline span shown in the editor always uses the raw letters the user typed
@@ -1442,18 +1493,12 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         shorthandActive = false
         shorthandSegments = emptyList()
         lastWasStandaloneW = false
-        // A commit ends the composition, so the candidate bar has nothing left to show.
-        // Hide it here directly: clear() only empties the content, it does NOT touch
-        // visibility. Whether the bar actually disappeared used to depend on whether the
-        // caller also happened to call updateComposing() afterwards (picks / some space
-        // modes did, onChar / onEnter / onSymbol / the segment-mode commit branches did
-        // not) – which is why an empty candidate bar sometimes lingered in place after a
-        // commit. Setting GONE at the single choke point makes it consistent everywhere.
-        if (::candidateBar.isInitialized) {
-            candidateBar.clear()
-            candidateBar.visibility = View.GONE
-        }
+        // A commit ends the composition, so the bar switches back to the idle punctuation
+        // strip (kept visible so the IME height stays constant). showIdleStrip both clears
+        // the bar's composing/candidate state and re-points it at the punctuation list, so
+        // it does not linger empty as it used to when only clear() was called.
         currentInputConnection?.finishComposingText()
+        showIdleStrip()
         maybeAutoShift()
     }
 
@@ -1468,14 +1513,11 @@ class NomInputMethodService : InputMethodService(), KeyboardView.KeyActionListen
         shorthandActive = false
         shorthandSegments = emptyList()
         lastWasStandaloneW = false
-        // Same rationale as in [commitComposing]: clear() leaves visibility untouched, so
-        // hide the bar explicitly. resetComposing runs on field focus changes / input
-        // finish, where a stale bar from the previous field would otherwise linger empty.
-        if (::candidateBar.isInitialized) {
-            candidateBar.clear()
-            candidateBar.visibility = View.GONE
-        }
+        // resetComposing runs on field focus changes / input finish. Restore the idle strip
+        // (or hide per preference) so the bar from the previous field doesn't linger empty.
+        if (::candidateBar.isInitialized) candidateBar.clear()
         currentInputConnection?.finishComposingText()
+        showIdleStrip()
     }
 
     // ============================ Misc helpers ============================
