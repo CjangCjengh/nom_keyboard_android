@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId = "com.nomkeyboard.app"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 8
         versionName = "1.1.5"
     }
