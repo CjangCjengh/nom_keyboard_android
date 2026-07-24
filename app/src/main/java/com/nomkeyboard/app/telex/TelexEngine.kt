@@ -203,6 +203,37 @@ object TelexEngine {
             return composing.dropLast(1) + restored
         }
 
+        // 0c. Mid-syllable hat undo: the same restore-original escape hatch as step 0,
+        //     but for hat-modified vowels (â/ê/ô) that are NO LONGER at the end of the
+        //     buffer because a coda consonant was typed after them via the long-distance
+        //     rule (1d). Typing the SAME trigger letter again reverts the most recent
+        //     such vowel to its bare form and appends the trigger literally – "rêt" +
+        //     'e' becomes "rete", mirroring how "rê" + 'e' -> "ree" already behaves via
+        //     undoMergeMap above. Only UNtoned modified vowels are reverted: a toned one
+        //     (ế/ố/ấ…) means the user has moved on to tone editing, and the tone keys
+        //     have their own undo in step 0b.
+        val hatUndoFamily: String? = when (ch) {
+            'a', 'A' -> "âÂ"
+            'e', 'E' -> "êÊ"
+            'o', 'O' -> "ôÔ"
+            else -> null
+        }
+        if (hatUndoFamily != null) {
+            for (i in composing.indices.reversed()) {
+                val c = composing[i]
+                if (!c.isLetter()) break
+                if (c in hatUndoFamily) {
+                    val bare = when (c) {
+                        'â' -> 'a'; 'Â' -> 'A'
+                        'ê' -> 'e'; 'Ê' -> 'E'
+                        'ô' -> 'o'; 'Ô' -> 'O'
+                        else -> c
+                    }
+                    return composing.substring(0, i) + bare + composing.substring(i + 1) + ch
+                }
+            }
+        }
+
         // 0b. Tone-undo: same idea for tone marks. If the trigger is s/f/r/x/j and the syllable
         //     already carries THAT specific tone, pressing the trigger again strips the tone
         //     AND appends the literal trigger character (so "as" -> "á", "ás" -> "as").
@@ -708,6 +739,13 @@ object TelexEngine {
      * intervening 'c' to find the bare 'o' waiting to be upgraded to 'ô'. We intentionally
      * restrict this to the same-case bare vowel to avoid overeager rewrites (e.g. we don't
      * want typing 'o' after "cô" to do anything strange).
+     *
+     * Phonotactic gate: the letters sitting AFTER the vowel we're about to upgrade must
+     * still leave a legal Vietnamese syllable ending, otherwise the hat must not fire.
+     * The canonical case is the double-press tone-undo escape: "re" + s -> "ré", + s ->
+     * "res" – that trailing 's' has already "broken out" of the Telex frame and 's' is not
+     * a legal Vietnamese coda, so a following 'e' must be appended literally ("rese"),
+     * not reach back and hat the vowel ("rês").
      */
     private fun rewriteHatLongDistance(composing: String, targetBase: Char, hatChar: Char): String? {
         for (i in composing.indices.reversed()) {
@@ -720,6 +758,7 @@ object TelexEngine {
             val entry = toneReverse[c]
             val baseOfC = entry?.first ?: c
             if (baseOfC == targetBase) {
+                if (!isLegalPostVowelEnding(composing, i + 1)) return null
                 val tone = entry?.second ?: 0
                 val repl = toneMap[hatChar]?.get(tone) ?: hatChar
                 return composing.substring(0, i) + repl + composing.substring(i + 1)
@@ -732,6 +771,35 @@ object TelexEngine {
             if (baseOfC == hatBase) return null
         }
         return null
+    }
+
+    /**
+     * Whether the letter run starting at [from] (everything after a vowel that is a
+     * long-distance hat candidate) is a legal way to end a Vietnamese syllable:
+     *   - empty (open syllable)                                -> legal  ("đẻ" + e -> "để")
+     *   - only vowels (the target sits inside a vowel cluster) -> legal  ("treo" + e -> "trêo")
+     *   - exactly one of the legal Vietnamese codas
+     *     (c, ch, m, n, ng, nh, p, t)                          -> legal  ("quoc" + o -> "quôc")
+     *   - anything else – an illegal coda such as 's' in "res" (the tone-undo escape hatch),
+     *     or a vowel appearing after a consonant               -> illegal: the hat must not
+     *     fire and the incoming letter is appended literally instead.
+     *
+     * Callers only ever pass a range of trailing letters (the backward scan in
+     * [rewriteHatLongDistance] stops at the first non-letter), so no non-letter check
+     * is needed here.
+     */
+    private fun isLegalPostVowelEnding(composing: String, from: Int): Boolean {
+        var sawConsonant = false
+        for (k in from until composing.length) {
+            val ch = composing[k]
+            if (ch.isVowelLike()) {
+                if (sawConsonant) return false
+            } else {
+                sawConsonant = true
+            }
+        }
+        if (!sawConsonant) return true
+        return composing.substring(from).lowercase() in VALID_CODAS
     }
 
     /**
