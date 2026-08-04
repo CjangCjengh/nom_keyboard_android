@@ -585,6 +585,10 @@ object TelexEngine {
         if (rewritten != null) return rewritten
 
         // No cluster match – decide whether to append a literal 'w' or an ư.
+        //   - Syllable is nothing but a gi-/qu- onset glide ("gi" / "qu" with no rhyme
+        //     vowel after it) -> the trailing i/u belongs to the ONSET, not the rhyme,
+        //     so the w supplies the vowel ư just like the pure-consonant case:
+        //     "gi" + w -> "giư" (needed for giương / giường / giưòng), "qu" + w -> "quư".
         //   - Syllable has letters but NO vowel yet (pure consonant onset like "ng", "nh",
         //     "th", "ch", "kh", "ph", "tr", "gh") -> the w serves as the vowel ư, so we
         //     append ư (case follows the trigger): "ng" + w -> "ngư", "Nh" + W -> "NhƯ".
@@ -594,7 +598,7 @@ object TelexEngine {
         //     standalone "ư".
         val syllableRest = composing.substring(syllableStart)
         if (syllableRest.any { it.isLetter() }) {
-            return if (syllableRest.none { it.isVowelLike() }) {
+            return if (syllableRest.none { it.isVowelLike() } || isBareGlideOnset(syllableRest)) {
                 composing + if (triggerUpper) 'Ư' else 'ư'
             } else {
                 composing + literalW
@@ -602,6 +606,17 @@ object TelexEngine {
         }
         return null
     }
+
+    /**
+     * Whether [syllable] consists of nothing but a gi-/qu- onset glide ("gi" / "qu", any
+     * case) with no rhyme vowel after it. In that position the trailing i/u is part of the
+     * onset, so a following 'w' must supply the vowel ư (e.g. "gi" + w -> "giư") instead
+     * of being appended literally.
+     */
+    private fun isBareGlideOnset(syllable: String): Boolean =
+        syllable.length == 2 &&
+            ((syllable[0].lowercaseChar() == 'g' && syllable[1].lowercaseChar() == 'i') ||
+                (syllable[0].lowercaseChar() == 'q' && syllable[1].lowercaseChar() == 'u'))
 
     /**
      * Cluster-based w-rewrite. Inspects the syllable starting at [syllableStart] in
@@ -615,12 +630,19 @@ object TelexEngine {
         // glideSkipOffset semantics but scoped to the current syllable).
         val syllableSub = composing.substring(syllableStart)
         val postGlideOffset = run {
-            if (syllableSub.length < 3) return@run 0
+            if (syllableSub.length < 2) return@run 0
             val c0 = syllableSub[0].lowercaseChar()
             val c1 = syllableSub[1].lowercaseChar()
+            val isGlide = (c0 == 'g' && c1 == 'i') || (c0 == 'q' && c1 == 'u')
+            if (!isGlide) return@run 0
             val hasFurtherVowel = (2 until syllableSub.length).any { syllableSub[it].isVowelLike() }
-            if (!hasFurtherVowel) return@run 0
-            if ((c0 == 'g' && c1 == 'i') || (c0 == 'q' && c1 == 'u')) 2 else 0
+            // Skip the glide when a real rhyme vowel follows it – or when the syllable is
+            // nothing but the bare glide ("gi"/"qu"): in the latter case there is no
+            // cluster to rewrite at all (skipping just yields "no match"), and the
+            // caller's fallback treats the w as the rhyme vowel ư ("gi" + w -> "giư").
+            // Without this, "qu" + w would horn the glide u itself and produce the
+            // invalid "qư".
+            if (hasFurtherVowel || syllableSub.length == 2) 2 else 0
         }
         val clusterSearchStart = syllableStart + postGlideOffset
 
@@ -1001,7 +1023,9 @@ object TelexEngine {
      *   - top branch: composing empty or last char is a non-letter (e.g. `"" + w → ư`,
      *     `"'" + w → "'ư"`);
      *   - pure-consonant-onset branch inside [rewriteHornForW]: the current syllable has
-     *     letters but none of them are vowel-like (e.g. `"ng" + w → "ngư"`).
+     *     letters but none of them are vowel-like (e.g. `"ng" + w → "ngư"`);
+     *   - bare gi-/qu- glide branch inside [rewriteHornForW]: the syllable is exactly
+     *     "gi"/"qu" and the w supplies the rhyme vowel (e.g. `"gi" + w → "giư"`).
      *
      * The caller uses this to set the `lastWasStandaloneW` flag so that a subsequent `w`
      * key can be recognised as the "cancel the shortcut" second press and get the literal
@@ -1018,10 +1042,11 @@ object TelexEngine {
             if (!tail[i].isLetter()) break
             start = i
         }
-        // Standalone-w iff the syllable run is empty (top branch) OR contains no vowel-like
-        // letter (pure consonant onset).
+        // Standalone-w iff the syllable run is empty (top branch), contains no vowel-like
+        // letter (pure consonant onset), or is nothing but a gi-/qu- onset glide (the
+        // trailing i/u belongs to the onset, so the w supplies the rhyme vowel ư).
         for (i in start until tail.length) {
-            if (tail[i].isVowelLike()) return false
+            if (tail[i].isVowelLike()) return isBareGlideOnset(tail.substring(start))
         }
         return true
     }

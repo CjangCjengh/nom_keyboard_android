@@ -98,4 +98,43 @@ class TelexEngineTest {
         assertEquals("too", apply("tô", 'o'))
         assertEquals("caa", apply("câ", 'a'))
     }
+
+    // ---- bare gi-/qu- onset glide + w ----------------------------------------
+    //
+    // The reported bug: "gi" + w must give "giư" (needed for the Nôm readings
+    // giương / giường / giưòng), not the literal "giw". The trailing i/u of a
+    // bare "gi"/"qu" syllable belongs to the ONSET glide, so the syllable has no
+    // rhyme vowel yet and the w supplies ư – exactly like the pure-consonant
+    // onset case ("ng" + w -> "ngư").
+
+    @Test
+    fun bareGlideOnsetWSuppliesUhorn() {
+        assertEquals("giư", apply("gi", 'w'))
+        assertEquals("quư", apply("qu", 'w'))
+        assertEquals("Giư", apply("Gi", 'w'))
+        assertEquals("GIƯ", apply("GI", 'W'))
+    }
+
+    @Test
+    fun bareGlideOnsetWSecondPressUndoes() {
+        // wouldBeStandaloneW must classify "gi"/"qu" as standalone-w so the IME
+        // sets the flag and a second 'w' cancels the shortcut back to a literal w.
+        assertEquals(true, TelexEngine.wouldBeStandaloneW("gi", 'w'))
+        assertEquals(true, TelexEngine.wouldBeStandaloneW("qu", 'w'))
+        assertEquals("giw", TelexEngine.apply("giư", 'w', lastWasStandaloneW = true))
+        assertEquals("quw", TelexEngine.apply("quư", 'w', lastWasStandaloneW = true))
+    }
+
+    @Test
+    fun glideBehaviourUnchangedWhenRhymeExists() {
+        // A real rhyme vowel after the glide keeps the old cluster behaviour.
+        assertEquals("giă", apply("gia", 'w'))
+        assertEquals("quă", apply("qua", 'w'))
+        assertEquals("giơ", apply("gio", 'w'))
+        // Non-glide syllables merely ending in i/u keep the literal w.
+        assertEquals("ngiw", apply("ngi", 'w'))
+        assertEquals("ginw", apply("gin", 'w'))
+        // A toned glide vowel means the user has moved on: literal w.
+        assertEquals("gìw", apply("gì", 'w'))
+    }
 }
