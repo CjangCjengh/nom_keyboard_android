@@ -10,16 +10,9 @@
     android:paddingEnd="14dp"
     android:paddingTop="12dp"
     android:paddingBottom="12dp"
-    android:background="@drawable/bg_entry_card">
+    android:background="?attr/selectableItemBackground">
 
-    <!-- 左侧小圆点装饰 -->
-    <View
-        android:layout_width="8dp"
-        android:layout_height="8dp"
-        android:background="@drawable/dot_gold"
-        android:layout_marginEnd="12dp" />
 
-    <!-- 两行文字 -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"

@@ -1,0 +1,4 @@
+<resources>
+    <!-- Launchers can apply their own mask without requesting android:roundIcon. -->
+    <item type="mipmap" name="ic_launcher">@mipmap/ic_launcher_round</item>
+</resources>

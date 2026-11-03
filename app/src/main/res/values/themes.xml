@@ -5,35 +5,11 @@
     <!-- 主应用主题：Material3 DayNight，绑定品牌色 token                  -->
     <!-- =============================================================== -->
     <style name="Theme.NomKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- 主色：深蓝（icon 底色） -->
-        <item name="colorPrimary">@color/brand_deep_blue</item>
-        <item name="colorOnPrimary">@color/brand_gold_soft</item>
-        <item name="colorPrimaryContainer">@color/brand_deep_blue_soft</item>
-        <item name="colorOnPrimaryContainer">@color/brand_gold_soft</item>
-
-        <!-- 次色：金黄（icon 字体色） -->
-        <item name="colorSecondary">@color/brand_gold_deep</item>
-        <item name="colorOnSecondary">@color/white</item>
-        <item name="colorSecondaryContainer">@color/brand_gold_soft</item>
-        <item name="colorOnSecondaryContainer">@color/brand_deep_blue</item>
-
-        <item name="colorTertiary">@color/brand_gold</item>
-        <item name="colorOnTertiary">@color/brand_deep_blue</item>
-
-        <item name="colorError">@color/brand_danger</item>
-
-        <!-- 表面 -->
-        <item name="android:colorBackground">@color/app_bg_light</item>
-        <item name="colorSurface">@color/app_surface_light</item>
-        <item name="colorSurfaceVariant">@color/app_surface_variant_light</item>
-        <item name="colorOnSurface">@color/app_text_primary_light</item>
-        <item name="colorOnSurfaceVariant">@color/app_text_secondary_light</item>
-        <item name="colorOutline">@color/app_outline_light</item>
-
-        <!-- 状态栏颜色跟随主色；浅色状态栏图标仅在亮色场景下启用 -->
-        <item name="android:statusBarColor">@color/brand_deep_blue</item>
-        <item name="android:navigationBarColor">?android:attr/colorBackground</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightNavigationBar">?attr/isLightTheme</item>
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
+        <item name="android:colorBackground">?attr/colorSurface</item>
     </style>
 
     <!-- IME 主题保持透明 -->
@@ -61,26 +37,22 @@
         <item name="android:lineSpacingMultiplier">1.15</item>
     </style>
 
-    <!-- 顶部 Hero 区的 app 名 -->
-    <style name="TextAppearance.App.HeroTitle" parent="TextAppearance.Material3.HeadlineSmall">
-        <item name="android:textColor">@color/brand_gold_soft</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:textSize">24sp</item>
+    <style name="Widget.App.SettingsRow" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:paddingStart">22dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:drawablePadding">26dp</item>
+        <item name="android:drawableTint">?attr/colorOnSurfaceVariant</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:textAppearance">?attr/textAppearanceBodyLarge</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:focusable">true</item>
     </style>
-
-    <style name="TextAppearance.App.HeroSubtitle" parent="TextAppearance.Material3.BodySmall">
-        <item name="android:textColor">#CFD7EE</item>
-        <item name="android:textSize">12sp</item>
-    </style>
-
-    <!-- 分组卡片：圆角 + 表面色 + 轻微阴影 -->
-    <style name="Widget.App.Card" parent="Widget.Material3.CardView.Elevated">
-        <item name="cardCornerRadius">16dp</item>
-        <item name="cardElevation">0dp</item>
-        <item name="cardBackgroundColor">?attr/colorSurface</item>
-        <item name="strokeWidth">1dp</item>
-        <item name="strokeColor">?attr/colorOutline</item>
-        <item name="contentPadding">16dp</item>
+    <style name="TextAppearance.App.Group" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textColor">?attr/colorPrimary</item>
     </style>
 
     <!-- 主按钮（实色填充） -->

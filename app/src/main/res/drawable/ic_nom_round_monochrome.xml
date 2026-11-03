@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="288" android:viewportHeight="288">
+    <!-- The central 192 units fill the launcher mask. The rest is adaptive bleed. -->
+    <group android:translateX="48" android:translateY="48">
+        <group>
+            <clip-path android:pathData="M-48 73H42Q42 82 49 88L96 123L143 88Q150 82 150 73H240V240H-48Z" />
+            <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:fillAlpha="0.62" android:pathData="M-48 73H240V240H-48Z M34 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M62 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M90 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M118 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M146 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M34 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M62 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M90 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M118 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M146 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M50 153h92q2 0 2 2v12q0 2 -2 2h-92q-2 0 -2 -2v-12q0 -2 2 -2z" />
+        </group>
+        <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M58 0H134Q146 0 146 12V73Q146 80 140 85L96 118L52 85Q46 80 46 73V12Q46 0 58 0Z M73.76 21.87H66.06V59.67H73.76ZM66.06 64.54V70.12H60.88V17.31H78.95V64.54ZM104.09 83.87V67.06H94.27V62.73H104.09V53.23H94.59V49.22H98.91L96.16 37.59H90.89V84.5H85.39V33.27H103.78V24.07H83.27V19.12H103.78V11.5H109.99V19.12H131.12V24.07H109.99V33.27H128.37V78.06Q128.37 81.12 126.25 82.69Q124.37 83.87 122.25 83.87H115.8L115.17 79H120.12Q122.87 79 122.87 76.25V37.59H117.29L113.92 49.22H119.5V53.23H109.36V62.73H119.5V67.06H109.36V83.87ZM112.42 37.59H101.03L103.54 49.22H109.67Z" />
+    </group>
+</vector>

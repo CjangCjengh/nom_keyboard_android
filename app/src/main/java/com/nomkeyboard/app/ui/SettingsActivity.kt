@@ -7,7 +7,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
-import android.widget.Button
+import android.view.View
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -28,30 +28,28 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.google.android.material.color.DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
-        findViewById<Button>(R.id.btn_enable).setOnClickListener {
+        findViewById<View>(R.id.btn_enable).setOnClickListener {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         }
-        findViewById<Button>(R.id.btn_choose).setOnClickListener {
+        findViewById<View>(R.id.btn_choose).setOnClickListener {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showInputMethodPicker()
         }
-        findViewById<Button>(R.id.btn_clear).setOnClickListener {
+        findViewById<View>(R.id.btn_clear).setOnClickListener {
             PreferenceManager.getDefaultSharedPreferences(this)
                 .edit()
                 .remove(NomInputMethodService.PREF_RECENT)
                 .apply()
             Toast.makeText(this, R.string.cleared, Toast.LENGTH_SHORT).show()
         }
-        findViewById<Button>(R.id.btn_user_dict).setOnClickListener {
+        findViewById<View>(R.id.btn_user_dict).setOnClickListener {
             startActivity(Intent(this, UserDictionaryActivity::class.java))
         }
-        // Tuỳ chọn is now a one-line entry that opens a dedicated full-screen page, so
-        // the landing screen doesn't feel cramped anymore. The row itself (a
-        // MaterialCardView with a ripple foreground) is the click target, not a Button.
-        findViewById<android.view.View>(R.id.btn_open_prefs).setOnClickListener {
+        findViewById<View>(R.id.btn_open_prefs).setOnClickListener {
             startActivity(Intent(this, PreferencesActivity::class.java))
         }
 
@@ -63,10 +61,8 @@ class SettingsActivity : AppCompatActivity() {
             null
         }
 
-        // Focus the test EditText so the keyboard pops up for quick trial.
         etTest = findViewById(R.id.et_test)
         applyTestInputTypeface()
-        etTest.requestFocus()
 
         // React to the "use bundled Nom font" preference being toggled (now on the
         // dedicated Preferences screen): re-apply the typeface when the user comes back.

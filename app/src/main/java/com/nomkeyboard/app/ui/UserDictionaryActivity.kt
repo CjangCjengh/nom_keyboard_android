@@ -50,8 +50,11 @@ class UserDictionaryActivity : AppCompatActivity(), UserDictionary.ChangeListene
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.google.android.material.color.DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_dict)
+        findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
+            .setNavigationOnClickListener { finish() }
 
         UserDictionary.ensureLoaded(applicationContext)
         UserDictionary.addChangeListener(this)

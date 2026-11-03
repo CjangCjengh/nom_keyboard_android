@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <dimen name="kb_key_height">52dp</dimen>
+    <dimen name="kb_key_height">48dp</dimen>
     <dimen name="kb_key_gap">4dp</dimen>
-    <dimen name="kb_row_gap">8dp</dimen>
-    <dimen name="kb_key_text_size">28sp</dimen>
-    <dimen name="kb_key_label_text_size">17sp</dimen>
-    <dimen name="kb_key_radius">8dp</dimen>
+    <dimen name="kb_row_gap">6dp</dimen>
+    <dimen name="kb_key_text_size">24sp</dimen>
+    <dimen name="kb_key_label_text_size">16sp</dimen>
+    <dimen name="kb_key_radius">6dp</dimen>
     <dimen name="kb_candidate_height">44dp</dimen>
     <dimen name="kb_candidate_text_size">22sp</dimen>
     <dimen name="kb_candidate_label_text_size">20sp</dimen>

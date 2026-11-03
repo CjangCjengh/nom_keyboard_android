@@ -6,7 +6,7 @@
     <color name="kb_key_func_light">#DCE0E6</color>
     <color name="kb_text_light">#1F1F1F</color>
     <color name="kb_text_func_light">#1F1F1F</color>
-    <color name="kb_accent_light">#4285F4</color>
+    <color name="kb_action_light">#C1D5FF</color>
     <color name="kb_press_light">#BFD3F5</color>
     <color name="kb_candidate_bg_light">#F2F3F7</color>
     <color name="kb_candidate_text_light">#1F1F1F</color>
@@ -18,7 +18,7 @@
     <color name="kb_key_func_dark">#2B2C2F</color>
     <color name="kb_text_dark">#FFFFFF</color>
     <color name="kb_text_func_dark">#E8EAED</color>
-    <color name="kb_accent_dark">#8AB4F8</color>
+    <color name="kb_action_dark">#394E70</color>
     <color name="kb_press_dark">#5F6368</color>
     <color name="kb_candidate_bg_dark">#1F1F1F</color>
     <color name="kb_candidate_text_dark">#FFFFFF</color>

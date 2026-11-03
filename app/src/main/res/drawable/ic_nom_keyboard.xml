@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.70" android:scaleY="0.70" android:translateX="19" android:translateY="19.5">
+        <group android:translateY="0.9"><path android:fillColor="#000000" android:fillAlpha="0.15" android:pathData="M13 42H87Q93 42 93 48V88Q93 94 87 94H13Q7 94 7 88V48Q7 42 13 42Z" /></group>
+        <path android:pathData="M13 42H87Q93 42 93 48V88Q93 94 87 94H13Q7 94 7 88V48Q7 42 13 42Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="50" android:startY="42" android:endX="50" android:endY="94" android:startColor="#706F70" android:endColor="#626262" />
+            </aapt:attr>
+        </path>
+        <path android:fillColor="#C4C4C4" android:fillAlpha="1" android:pathData="M19 51.5h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M32.9 51.5h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M46.7 51.5h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M60.5 51.5h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M74.4 51.5h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M19 65.4h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M32.9 65.4h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M46.7 65.4h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M60.5 65.4h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M74.4 65.4h6.6q1 0 1 1v6.6q0 1 -1 1h-6.6q-1 0 -1 -1v-6.6q0 -1 1 -1z M26 80.5h48q1 0 1 1v4.8q0 1 -1 1h-48q-1 0 -1 -1v-4.8q0 -1 1 -1z" />
+        <path android:fillColor="#222222" android:fillAlpha="0.17" android:pathData="M19.5 48L51.4 44L80.5 45L93 57.5V88Q93 94 87 94H68L24 56Q19.5 52 19.5 48Z" />
+        <group android:translateY="1.05"><path android:fillColor="#111111" android:fillAlpha="0.15" android:pathData="M26 4H74Q80.5 4 80.5 11V48Q80.5 52 76 55.5L50 76L24 55.5Q19.5 52 19.5 48V11Q19.5 4 26 4Z" /></group>
+        <path android:pathData="M26 4H74Q80.5 4 80.5 11V48Q80.5 52 76 55.5L50 76L24 55.5Q19.5 52 19.5 48V11Q19.5 4 26 4Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="50" android:startY="4" android:endX="50" android:endY="76" android:startColor="#43C2D6" android:endColor="#27BCD4" />
+            </aapt:attr>
+        </path>
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.22" android:pathData="M26 4H74Q80.5 4 80.5 11Q79.5 5.3 74 5.3H26Q20.4 5.3 19.5 11Q19.5 4 26 4Z" />
+        <path android:fillColor="#FFFFFF" android:fillAlpha="1" android:pathData="M37.81 19.68H33.6V40.39H37.81ZM33.6 43.06V46.12H30.75V17.19H40.66V43.06ZM54.43 53.66V44.44H49.05V42.07H54.43V36.86H49.22V34.67H51.59L50.09 28.29H47.2V54H44.19V25.93H54.26V20.89H43.02V18.18H54.26V14H57.66V18.18H69.25V20.89H57.66V25.93H67.74V50.47Q67.74 52.15 66.58 53.01Q65.54 53.66 64.38 53.66H60.85L60.51 50.99H63.22Q64.73 50.99 64.73 49.48V28.29H61.67L59.82 34.67H62.87V36.86H57.32V42.07H62.87V44.44H57.32V53.66ZM59 28.29H52.76L54.13 34.67H57.49Z" />
+    </group>
+</vector>

@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import androidx.core.graphics.PathParser
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -50,6 +51,7 @@ class KeyboardView @JvmOverloads constructor(
         theme = t
         keyBgPaint.color = t.key
         keyFuncBgPaint.color = t.keyFunc
+        actionBgPaint.color = t.action
         keyPressPaint.color = t.press
         textPaint.color = t.text
         textFuncPaint.color = t.textFunc
@@ -67,14 +69,20 @@ class KeyboardView @JvmOverloads constructor(
     }
     private val textFuncPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = Typeface.DEFAULT
     }
-    private val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-
-    // Stroke paint used to highlight the Shift key when it is in the "temporary uppercase" or
-    // "caps-lock" state. This gives immediate visual feedback so the user knows whether the
-    // next letter will be capitalised.
-    private val shiftActivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val actionBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    // Paths use the same 24dp viewport so the controls align regardless of font fallback.
+    private val icons = mapOf(
+        KeyCode.SHIFT to "M12 3l9 10h-5v7H8v-7H3z M12 6l-4.5 5H10v7h4v-7h2.5z",
+        KeyCode.BACKSPACE to "M8 4h14v16H8l-7-8z M9 6l-5.4 6L9 18h11V6z M10 9l1.4-1.4L14 10.2l2.6-2.6L18 9l-2.6 2.6L18 14.2l-1.4 1.4-2.6-2.6-2.6 2.6-1.4-1.4 2.6-2.6z",
+        KeyCode.ENTER to "M20 6v6a2 2 0 0 1-2 2H6.8l3.6 3.6L9 19l-6-6 6-6 1.4 1.4L6.8 12H18V6z",
+        KeyCode.LANGUAGE to "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20 M4.3 11a8 8 0 0 1 4.1-6a17 17 0 0 0-1.3 6z M9.1 11c.3-3.2 1.6-5.9 2.9-7 1.3 1.1 2.6 3.8 2.9 7z M16.9 11a17 17 0 0 0-1.3-6a8 8 0 0 1 4.1 6z M4.3 13h2.8a17 17 0 0 0 1.3 6a8 8 0 0 1-4.1-6z M9.1 13h5.8c-.3 3.2-1.6 5.9-2.9 7-1.3-1.1-2.6-3.8-2.9-7z M16.9 13h2.8a8 8 0 0 1-4.1 6a17 17 0 0 0 1.3-6z",
+    ).mapValues { (_, data) -> PathParser.createPathFromPathData(data).apply {
+        fillType = android.graphics.Path.FillType.EVEN_ODD
+    } }
+    private val shiftFilled = PathParser.createPathFromPathData("M12 3l9 10h-5v7H8v-7H3z")
 
     // ----------- Dimensions -----------
     private val keyHeight = resources.getDimension(R.dimen.kb_key_height)
@@ -130,6 +138,16 @@ class KeyboardView @JvmOverloads constructor(
         COMMA, PERIOD, LANGUAGE, QUESTION, EMOJI
     }
 
+    private fun bottomRow(letters: Boolean) = listOf(
+        if (letters) Key("?123", KeyCode.SYMBOL, 1.45f, func = true)
+        else Key("ABC", KeyCode.LETTER, 1.45f, func = true),
+        Key(",", KeyCode.COMMA),
+        Key("", KeyCode.LANGUAGE, func = true),
+        Key("Chữ Nôm", KeyCode.SPACE, 4.1f),
+        Key(".", KeyCode.PERIOD),
+        Key("", KeyCode.ENTER, 1.45f, func = true),
+    )
+
     // Letters page
     private val lettersRows: List<List<Key>> = listOf(
         "qwertyuiop".map { Key(it.toString(), KeyCode.CHAR) },
@@ -137,14 +155,7 @@ class KeyboardView @JvmOverloads constructor(
         listOf(Key("⇧", KeyCode.SHIFT, weight = 1.4f, func = true)) +
                 "zxcvbnm".map { Key(it.toString(), KeyCode.CHAR) } +
                 listOf(Key("⌫", KeyCode.BACKSPACE, weight = 1.4f, func = true)),
-        listOf(
-            Key("?123", KeyCode.SYMBOL, weight = 1.6f, func = true),
-            Key(",", KeyCode.COMMA, func = false),
-            Key("🌐", KeyCode.LANGUAGE, func = true),
-            Key("space", KeyCode.SPACE, weight = 4.4f),
-            Key(".", KeyCode.PERIOD, func = false),
-            Key("⏎", KeyCode.ENTER, weight = 1.6f, func = true),
-        ),
+        bottomRow(true),
     )
 
     // Symbols page 1
@@ -154,14 +165,7 @@ class KeyboardView @JvmOverloads constructor(
         listOf(Key("=\\<", KeyCode.SYMBOL2, weight = 1.4f, func = true)) +
                 "\"':;!?".map { Key(it.toString(), KeyCode.CHAR) } +
                 listOf(Key("⌫", KeyCode.BACKSPACE, weight = 1.4f, func = true)),
-        listOf(
-            Key("ABC", KeyCode.LETTER, weight = 1.6f, func = true),
-            Key(",", KeyCode.COMMA, func = false),
-            Key("🌐", KeyCode.LANGUAGE, func = true),
-            Key("space", KeyCode.SPACE, weight = 4.4f),
-            Key(".", KeyCode.PERIOD, func = false),
-            Key("⏎", KeyCode.ENTER, weight = 1.6f, func = true),
-        ),
+        bottomRow(false),
     )
 
     // Symbols page 2
@@ -171,14 +175,7 @@ class KeyboardView @JvmOverloads constructor(
         listOf(Key("?123", KeyCode.SYMBOL, weight = 1.4f, func = true)) +
                 "\\/<>{}[]".map { Key(it.toString(), KeyCode.CHAR) } +
                 listOf(Key("⌫", KeyCode.BACKSPACE, weight = 1.4f, func = true)),
-        listOf(
-            Key("ABC", KeyCode.LETTER, weight = 1.6f, func = true),
-            Key(",", KeyCode.COMMA, func = false),
-            Key("🌐", KeyCode.LANGUAGE, func = true),
-            Key("space", KeyCode.SPACE, weight = 4.4f),
-            Key(".", KeyCode.PERIOD, func = false),
-            Key("⏎", KeyCode.ENTER, weight = 1.6f, func = true),
-        ),
+        bottomRow(false),
     )
 
     private fun currentRows(): List<List<Key>> = when (page) {
@@ -210,11 +207,12 @@ class KeyboardView @JvmOverloads constructor(
         if (w <= 0) return
         val usableWidth = w - sidePad * 2
         var y = topPad
-        for (row in rows) {
+        for ((rowIndex, row) in rows.withIndex()) {
             val totalWeight = row.sumOf { it.weight.toDouble() }.toFloat()
             val totalGap = keyGap * (row.size - 1)
-            val unit = (usableWidth - totalGap) / totalWeight
-            var x = sidePad
+            val inset = if (page == 0 && rowIndex == 1) (usableWidth + keyGap) / 20f else 0f
+            val unit = (usableWidth - 2 * inset - totalGap) / totalWeight
+            var x = sidePad + inset
             for (key in row) {
                 val keyW = unit * key.weight
                 val rect = RectF(x, y, x + keyW, y + keyHeight)
@@ -237,119 +235,94 @@ class KeyboardView @JvmOverloads constructor(
         val pressed = pressedKey === kr
         val bgPaint = when {
             pressed -> keyPressPaint
+            k.code == KeyCode.ENTER -> actionBgPaint
             k.func -> keyFuncBgPaint
-            k.code == KeyCode.SPACE -> keyFuncBgPaint
             else -> keyBgPaint
         }
-        canvas.drawRoundRect(kr.rect, keyRadius, keyRadius, bgPaint)
+        val pill = k.code in actionKeys
+        val radius = if (pill) kr.rect.height() / 2 else keyRadius
+        canvas.drawRoundRect(kr.rect, radius, radius, bgPaint)
 
-        // Text
-        val paint = if (k.func) textFuncPaint else textPaint
-        paint.textSize = when (k.code) {
-            KeyCode.SHIFT, KeyCode.BACKSPACE, KeyCode.ENTER, KeyCode.LANGUAGE -> keyTextSize * 1.05f
-            KeyCode.SPACE, KeyCode.SYMBOL, KeyCode.SYMBOL2, KeyCode.LETTER -> keyLabelTextSize * 1.1f
-            else -> keyTextSize
+        val cx = kr.rect.centerX()
+        val cy = kr.rect.centerY()
+        val icon = if (k.code == KeyCode.SHIFT && shift > 0) shiftFilled else icons[k.code]
+        if (icon != null) {
+            iconPaint.color = theme.textFunc
+            canvas.save()
+            val scale = (keyTextSize / 24f).coerceAtMost(kr.rect.width() / 30f)
+            canvas.translate(cx - 12 * scale, cy - 12 * scale)
+            canvas.scale(scale, scale)
+            canvas.drawPath(icon, iconPaint)
+            if (k.code == KeyCode.SHIFT && shift == 2) canvas.drawRect(8f, 21f, 16f, 23f, iconPaint)
+            canvas.restore()
+            return
         }
-
-        // Adjust label for state-dependent keys.
-        // Shift uses a single arrow in all states; its state is conveyed by filled/hollow styling
-        // (see the stroke pass below), which matches Gboard and avoids the confusing "double arrow".
-        val displayLabel = when (k.code) {
-            KeyCode.SHIFT -> "⇧"
-            KeyCode.CHAR -> if (page == 0 && shift > 0) k.label.uppercase() else k.label
-            KeyCode.SPACE -> " "   // drawn as a thin indicator bar instead of text
-            else -> k.label
-        }
-
-        val cx = (kr.rect.left + kr.rect.right) / 2f
-        val textY = (kr.rect.top + kr.rect.bottom) / 2f - (paint.descent() + paint.ascent()) / 2f
-
-        // When Shift is active (temporary) or locked, overlay an accent-coloured ring around the
-        // Shift key and tint its glyph so the user gets an unambiguous visual cue.
-        if (k.code == KeyCode.SHIFT && shift > 0) {
-            shiftActivePaint.color = theme.accent
-            shiftActivePaint.strokeWidth = if (shift == 2) 6f else 3f
-            val inset = shiftActivePaint.strokeWidth / 2f
-            val ringRect = RectF(
-                kr.rect.left + inset, kr.rect.top + inset,
-                kr.rect.right - inset, kr.rect.bottom - inset,
-            )
-            canvas.drawRoundRect(ringRect, keyRadius, keyRadius, shiftActivePaint)
-            val originalColor = paint.color
-            paint.color = theme.accent
-            canvas.drawText(displayLabel, cx, textY, paint)
-            paint.color = originalColor
-        } else {
-            canvas.drawText(displayLabel, cx, textY, paint)
-        }
-
-        // Draw a thin centred bar on the SPACE key (signature Gboard detail)
-        if (k.code == KeyCode.SPACE) {
-            dividerPaint.color = theme.divider
-            val barW = kr.rect.width() * 0.3f
-            val bar = RectF(
-                cx - barW / 2, kr.rect.centerY() + 8f,
-                cx + barW / 2, kr.rect.centerY() + 11f
-            )
-            canvas.drawRoundRect(bar, 2f, 2f, dividerPaint)
-        }
-
-        // Draw a small dot on top of the Caps-Lock-style Shift when shift == 2 so it reads as
-        // "always on" in the same language as most soft keyboards (a filled dot below the arrow).
-        if (k.code == KeyCode.SHIFT && shift == 2) {
-            val dotR = 3f
-            canvas.drawCircle(cx, kr.rect.bottom - dotR * 3f, dotR, paint)
-        }
+        val paint = if (k.func || k.code == KeyCode.SPACE) textFuncPaint else textPaint
+        paint.textSize = if (k.func || k.code == KeyCode.SPACE) keyLabelTextSize else keyTextSize
+        val label = if (k.code == KeyCode.CHAR && page == 0 && shift > 0) k.label.uppercase() else k.label
+        canvas.drawText(label, cx, cy - (paint.descent() + paint.ascent()) / 2, paint)
     }
+
+    private val actionKeys = setOf(KeyCode.ENTER, KeyCode.SYMBOL, KeyCode.LETTER, KeyCode.SYMBOL2)
 
     // ----------- Touch handling -----------
     private var pressedKey: KeyRect? = null
     private val handler = Handler(Looper.getMainLooper())
-    private var repeatRunnable: Runnable? = null
+    private var pointer = MotionEvent.INVALID_POINTER_ID
+    private var repeated = false
+    private val repeatDelete = object : Runnable {
+        override fun run() {
+            if (pressedKey?.key?.code != KeyCode.BACKSPACE) return
+            repeated = true
+            listener?.onBackspace()
+            handler.postDelayed(this, 60)
+        }
+    }
+
+    private fun press(key: KeyRect?) {
+        handler.removeCallbacks(repeatDelete)
+        repeated = false
+        pressedKey = key
+        if (key?.key?.code == KeyCode.BACKSPACE) handler.postDelayed(repeatDelete, 400)
+        invalidate()
+    }
+
+    private fun release(commit: Boolean) {
+        val key = pressedKey?.key
+        val dispatch = commit && !repeated
+        pointer = MotionEvent.INVALID_POINTER_ID
+        press(null)
+        if (dispatch && key != null) handleKey(key)
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val x = event.x
-        val y = event.y
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                val hit = findKey(x, y) ?: return true
-                pressedKey = hit
-                invalidate()
-                if (hapticsEnabled) {
-                    // Respect the user's global haptic-feedback preference; do not force-override it.
-                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                }
-                // Long-press repeat for backspace
-                if (hit.key.code == KeyCode.BACKSPACE) {
-                    repeatRunnable = object : Runnable {
-                        override fun run() {
-                            listener?.onBackspace()
-                            handler.postDelayed(this, 60)
-                        }
-                    }
-                    handler.postDelayed(repeatRunnable!!, 400)
-                }
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                // Rollover typing: finish the previous letter before starting the next.
+                release(event.actionMasked == MotionEvent.ACTION_POINTER_DOWN)
+                val i = event.actionIndex
+                pointer = event.getPointerId(i)
+                press(findKey(event.getX(i), event.getY(i)))
+                if (pressedKey != null && hapticsEnabled) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             }
             MotionEvent.ACTION_MOVE -> {
-                // Allow sliding to an adjacent key without lifting the finger.
-                val cur = findKey(x, y)
-                if (cur != null && cur !== pressedKey) {
-                    pressedKey = cur
-                    invalidate()
+                val i = event.findPointerIndex(pointer)
+                if (i >= 0) {
+                    val key = findKey(event.getX(i), event.getY(i))
+                    if (key !== pressedKey) press(key)
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                repeatRunnable?.let { handler.removeCallbacks(it) }
-                repeatRunnable = null
-                val hit = pressedKey
-                pressedKey = null
-                invalidate()
-                if (event.actionMasked == MotionEvent.ACTION_UP && hit != null) {
-                    handleKey(hit.key)
-                }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                if (event.getPointerId(event.actionIndex) == pointer) release(true)
             }
+            MotionEvent.ACTION_CANCEL -> release(false)
         }
         return true
+    }
+
+    override fun onDetachedFromWindow() {
+        release(false)
+        super.onDetachedFromWindow()
     }
 
     /** Find the key under (x, y); if none, return the closest key on the same row within tolerance. */
@@ -358,7 +331,7 @@ class KeyboardView @JvmOverloads constructor(
         var bestDx = Float.MAX_VALUE
         for (kr in keyRects) {
             if (kr.rect.contains(x, y)) return kr
-            if (y >= kr.rect.top && y <= kr.rect.bottom) {
+            if (y >= kr.rect.top - rowGap / 2 && y < kr.rect.bottom + rowGap / 2) {
                 val dx = when {
                     x < kr.rect.left -> kr.rect.left - x
                     x > kr.rect.right -> x - kr.rect.right

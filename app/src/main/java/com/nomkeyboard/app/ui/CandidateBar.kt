@@ -70,7 +70,7 @@ class CandidateBar @JvmOverloads constructor(
     private val chevronBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val chevronPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 4f
+        strokeWidth = 1.7f * resources.displayMetrics.density
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
@@ -262,8 +262,10 @@ class CandidateBar @JvmOverloads constructor(
         invalidate()
     }
 
-    private val padH = 24f    // horizontal padding inside each candidate cell
-    private val gap = 8f      // gap between cells
+    private val density = resources.displayMetrics.density
+    private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+    private val padH = 10f * density    // horizontal padding inside each candidate cell
+    private val gap = 3f * density      // gap between cells
 
     private fun layoutCandidates() {
         candidateRects.clear()
@@ -298,38 +300,14 @@ class CandidateBar @JvmOverloads constructor(
         } else {
             composingRect.setEmpty()
         }
-        val starts = FloatArray(candidates.size)
-        val ends = FloatArray(candidates.size)
-        for ((i, c) in candidates.withIndex()) {
-            val tw = max(textPaint.measureText(c), 28f) + padH * 2
-            starts[i] = x
-            ends[i] = x + tw
-            x += tw + gap
+        for (candidate in candidates) {
+            val cellWidth = max(textPaint.measureText(candidate), 16f * density) + padH * 2
+            candidateRects.add(RectF(x, 0f, x + cellWidth, h))
+            x += cellWidth + gap
         }
-        val totalContentWidth = x
-        val viewportW = width.toFloat()
-        // The chevron is only useful when the content can't fit; otherwise it would just
-        // eat horizontal space and partially cover the rightmost candidate. In punctuation
-        // mode the chevron is ALWAYS shown (even when the short row fits): it's the user's
-        // way to pop out the full set (both fullwidth + halfwidth) without leaving the bar.
-        val overflows = totalContentWidth > viewportW
-        chevronVisible = overflows || mode == Mode.PUNCTUATION
-        // Effective right edge that candidates are allowed to occupy. Tied to chevronVisible
-        // (not raw `overflows`) so that the chevron-width gap is reserved exactly when the
-        // chevron is drawn.
-        val rightLimit = if (chevronVisible) viewportW - chevronW else viewportW
-        for (i in candidates.indices) {
-            // Keep each candidate's cell at its natural width. We do NOT clamp the right
-            // edge to `rightLimit` here: the cell is in CONTENT coordinates (the strip
-            // scrolls horizontally) so clamping would collapse every off-screen cell's
-            // right edge onto the same x and make their glyphs stack on top of each
-            // other when the user scrolls. Instead the chevron is drawn on top of the
-            // strip as an opaque overlay – it naturally "covers" whichever candidate
-            // happens to sit under it at the moment, and `maxScrollX` guarantees the
-            // user can still scroll the last candidate fully into the visible area
-            // (i.e. to the left of the chevron).
-            candidateRects.add(RectF(starts[i], 0f, ends[i], h))
-        }
+        val totalContentWidth = if (candidates.isEmpty()) x else x - gap
+        chevronVisible = totalContentWidth > width || mode == Mode.PUNCTUATION
+        val rightLimit = if (chevronVisible) width - chevronW else width.toFloat()
         maxScrollX = max(0f, totalContentWidth - rightLimit)
         maxScrollY = 0f
     }
@@ -355,7 +333,7 @@ class CandidateBar @JvmOverloads constructor(
         val firstRowRight = width - chevronW
         val fullRowRight = width.toFloat()
         for (c in candidates) {
-            val tw = max(textPaint.measureText(c), 28f) + padH * 2
+            val tw = max(textPaint.measureText(c), 16f * density) + padH * 2
             val rightLimit = if (row == 0) firstRowRight else fullRowRight
             if (x + tw > rightLimit) {
                 // Wrap to next row
@@ -500,7 +478,7 @@ class CandidateBar @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 val dx = rawX - downX
                 val dy = rawY - downY
-                if (!dragged && (kotlin.math.abs(dx) > 16f || kotlin.math.abs(dy) > 16f)) {
+                if (!dragged && (kotlin.math.abs(dx) > touchSlop || kotlin.math.abs(dy) > touchSlop)) {
                     dragged = true
                 }
                 if (dragged) {

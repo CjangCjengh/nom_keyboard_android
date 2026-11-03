@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="288" android:viewportHeight="288">
+    <!-- The central 192 units fill the launcher mask. The rest is adaptive bleed. -->
+    <group android:translateX="48" android:translateY="48">
+        <path android:fillColor="#EFEFEF" android:pathData="M-48 -48H240V240H-48Z" />
+        <path android:fillColor="#646565" android:pathData="M-48 73H240V240H-48Z" />
+        <path android:fillColor="#C2C2C1" android:pathData="M34 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M62 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M90 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M118 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M146 96h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M34 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M62 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M90 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M118 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M146 124h12q2 0 2 2v12q0 2 -2 2h-12q-2 0 -2 -2v-12q0 -2 2 -2z M50 153h92q2 0 2 2v12q0 2 -2 2h-92q-2 0 -2 -2v-12q0 -2 2 -2z" />
+    </group>
+</vector>
