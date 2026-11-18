@@ -264,6 +264,8 @@ object TelexEngine {
         //        * nothing letter-like in the syllable -> append a standalone "ư"
         //          (covers "ng" + w -> "ngư").
         if (ch == 'w' || ch == 'W') {
+            // A literal w already ended the Telex sequence (e.g. ww -> w).
+            if (composing.last() == 'w' || composing.last() == 'W') return composing + ch
             val rewritten = rewriteHornForW(composing, triggerUpper = ch == 'W')
             if (rewritten != null) return rewritten
             return composing + if (ch == 'W') 'Ư' else 'ư'
@@ -1036,6 +1038,7 @@ object TelexEngine {
      */
     fun wouldBeStandaloneW(tail: String, ch: Char): Boolean {
         if (ch != 'w' && ch != 'W') return false
+        if (tail.endsWith('w') || tail.endsWith('W')) return false
         // Locate the start of the trailing letter run (== current syllable).
         var start = tail.length
         for (i in tail.indices.reversed()) {

@@ -126,6 +126,25 @@ class TelexEngineTest {
     }
 
     @Test
+    fun repeatedWStaysLiteralAfterUndo() {
+        fun outputs(keys: String): List<String> {
+            var composing = ""
+            var lastWasStandaloneW = false
+            return keys.map { key ->
+                val next = TelexEngine.apply(composing, key, lastWasStandaloneW = lastWasStandaloneW)
+                lastWasStandaloneW = TelexEngine.wouldBeStandaloneW(composing, key)
+                composing = next
+                next
+            }
+        }
+
+        assertEquals(listOf("ư", "w", "ww", "www"), outputs("wwww"))
+        assertEquals(listOf("Ư", "W", "Ww", "WwW"), outputs("WWwW"))
+        assertEquals(listOf("g", "gi", "giư", "giw", "giww"), outputs("giwww"))
+        assertEquals(listOf("u", "ư", "uw", "uww"), outputs("uwww"))
+    }
+
+    @Test
     fun glideBehaviourUnchangedWhenRhymeExists() {
         // A real rhyme vowel after the glide keeps the old cluster behaviour.
         assertEquals("giă", apply("gia", 'w'))
